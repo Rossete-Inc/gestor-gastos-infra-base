@@ -1,0 +1,27 @@
+# Go
+bootstrap
+*.zip
+*.test
+coverage.out
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# CDK
+cdk.out/
+.cdk.staging/
+
+# Env / segredos
+.env
+.env.*
+!.env.example
+
+# SO / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

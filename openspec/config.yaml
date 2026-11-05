@@ -1,0 +1,46 @@
+schema: spec-driven
+
+context: |
+  Language: pt-BR
+  All artifacts must be written in pt-BR.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Projeto: Gestor de Gastos — lançamento de gastos de cartão e gastos fixos,
+  listas e gráficos de pizza por grupo/categoria, login com papéis admin/cliente.
+  Este repositório é o gestor-gastos-infra-base (docs transversais + infra compartilhada).
+  Fontes da verdade: docs/plano.md, docs/diagramas.md e docs/adr/ (respeitar ADRs aceitos;
+  mudança de decisão exige novo ADR).
+
+  Decisões principais:
+  - Repositórios separados na org GitHub Rossete-Inc, sem monorepo (ADR 0006).
+  - Back-end em Go (Lambda provided.al2023, arm64) (ADR 0001); microserviços users,
+    categories, expenses + BFF como único ponto público (ADR 0003), BFF -> serviços via
+    Lambda Invoke/IAM (ADR 0004); integração entre repos só via SSM, OpenAPI versionado
+    e tags da go-commons.
+  - DynamoDB on-demand, uma tabela por serviço, valores em centavos int64 (ADR 0002).
+  - Cognito (grupos admin/cliente), API Gateway HTTP API com authorizer JWT, EventBridge.
+  - Front: Expo + React Native + Expo Router, PWA no Amplify (skill app-multiplataforma-guardrails).
+  - CI/CD: GitHub Actions + CDK + OIDC; merge na main -> dev, tag -> prod com aprovação (ADR 0007).
+  - Custo mínimo: preferir serverless e free tier.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
