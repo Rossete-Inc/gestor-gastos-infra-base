@@ -7,8 +7,11 @@
 - [x] 1.1 Criar os 7 repositórios **públicos** em Rossete-Inc (`gestor-gastos-infra-base`, `-go-commons`, `-users-service`, `-categories-service`, `-expenses-service`, `-bff`, `-frontend`) com a branch `main` protegida; verificar com `gh repo list Rossete-Inc`
   - Públicos porque a org está no plano Free (ver design.md, "Repositórios públicos e região"). A proteção da `main` exige PR (0 aprovações, já que o desenvolvedor é único), histórico linear e conversas resolvidas, vale também para admins e bloqueia force push e exclusão. Ela já está aplicada nos 6 repositórios iniciados com README.
   - O `infra-base` foi criado vazio para receber o push da 1.2. A proteção dele é aplicada ao fim da 1.2.
-- [ ] 1.2 Ligar este diretório ao remoto `gestor-gastos-infra-base`, fazer commit e push dos docs e do OpenSpec, e aplicar a proteção da `main` do mesmo jeito da 1.1; verificar o README renderizado no GitHub
-- [ ] 1.3 Criar os GitHub Environments `dev` e `prod` em cada repositório implantável, com aprovação obrigatória em `prod`, e o template de PR com o item "Validado localmente"; verificar nas configurações de cada repositório
+- [x] 1.2 Ligar este diretório ao remoto `gestor-gastos-infra-base`, fazer commit e push dos docs e do OpenSpec, e aplicar a proteção da `main` do mesmo jeito da 1.1; verificar o README renderizado no GitHub
+- [x] 1.3 Criar os GitHub Environments `dev` e `prod` em cada repositório implantável, com aprovação obrigatória em `prod`, e o template de PR com o item "Validado localmente"; verificar nas configurações de cada repositório
+  - Environments em `infra-base`, `users-service`, `categories-service`, `expenses-service`, `bff` e `frontend`. O `go-commons` fica de fora porque não é implantável.
+  - `dev` aceita deploy só da branch `main`. `prod` aceita deploy só de tags `v*.*.*` e exige aprovação de `rrossete`, com autoaprovação permitida porque o desenvolvedor é único.
+  - O `.github/pull_request_template.md` foi adicionado por PR nos 7 repositórios.
 
 ## 2. Design (Figma)
 
