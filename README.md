@@ -9,6 +9,7 @@ Todos os repositórios do sistema ficam na organização GitHub [Rossete-Inc](ht
 - `docs/plano.md`: plano de desenvolvimento.
 - `docs/diagramas.md`: diagramas Mermaid (arquitetura, fluxos, telas, dados, deploy).
 - `docs/adr/`: decisões de arquitetura transversais.
+- `docs/local.md` e `local/`: ambiente local (DynamoDB Local, dynamodb-admin, cognito-local e seed). Para subir: `task local:up` e depois `task local:seed`.
 - `.github/workflows/`: workflows reutilizáveis da esteira, usados por todos os repositórios.
 - `infra/`: AWS CDK (Go) com stack `cicd` (OIDC + roles de deploy), Cognito (+ trigger), API Gateway HTTP API + authorizer JWT, barramento EventBridge e AWS Budget. Os IDs são publicados no SSM Parameter Store em `/gestor-gastos/<env>/...`.
 

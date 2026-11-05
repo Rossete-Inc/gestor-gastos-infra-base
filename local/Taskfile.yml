@@ -1,0 +1,42 @@
+version: "3"
+
+# Ambiente local do Gestor de Gastos. Use pela raiz: `task local:up` etc.
+# Detalhes em docs/local.md.
+
+env:
+  SEED_ENV_FILE: ../.env.cognito
+
+tasks:
+  up:
+    desc: Sobe DynamoDB Local, dynamodb-admin e cognito-local e prepara o User Pool
+    cmds:
+      - docker compose up -d --wait
+      - go -C seed run . cognito
+      - echo "DynamoDB http://localhost:8000 | dynamodb-admin http://localhost:8001 | cognito-local http://localhost:9229"
+
+  seed:
+    desc: Cria tabelas, categorias padrão e usuários de teste (idempotente)
+    cmds:
+      - go -C seed run . data
+
+  reset:
+    desc: Apaga todos os dados locais, sobe de novo e refaz o seed
+    cmds:
+      - docker compose down -v
+      - task: up
+      - task: seed
+
+  down:
+    desc: Para os containers e mantém os dados
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: Mostra os logs do cognito-local, onde aparece o código de confirmação de e-mail
+    cmds:
+      - docker compose logs -f cognito
+
+  status:
+    desc: Mostra o estado dos containers
+    cmds:
+      - docker compose ps

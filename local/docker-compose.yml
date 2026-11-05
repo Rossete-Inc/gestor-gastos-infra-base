@@ -1,0 +1,54 @@
+# Ambiente local do Gestor de Gastos: emula DynamoDB e Cognito sem AWS.
+# Suba com `task local:up` na raiz do infra-base (ver docs/local.md).
+name: gestor-gastos
+
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:2.6.1
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
+    working_dir: /home/dynamodblocal
+    user: root
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    healthcheck:
+      # Qualquer resposta HTTP (o endpoint responde 400 sem assinatura) indica que está no ar.
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://localhost:8000 || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:5.1.3
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    ports:
+      - "8001:8001"
+    depends_on:
+      dynamodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8001/',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  cognito:
+    image: jagregory/cognito-local:3.23.2
+    ports:
+      - "9229:9229"
+    volumes:
+      - cognito-data:/app/.cognito
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9229/',()=>process.exit(0)).on('error',()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  dynamodb-data:
+  cognito-data:
