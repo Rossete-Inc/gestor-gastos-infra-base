@@ -24,9 +24,11 @@
 
 ## 3. Ambiente local (`gestor-gastos-infra-base`, pasta `local/`)
 
-- [ ] 3.1 Criar o `docker-compose.yml` com DynamoDB Local (8000), dynamodb-admin (8001) e cognito-local (9229). O cognito-local replica o User Pool: e-mail como login, política de senha, grupos `admin` e `cliente` e app client sem secret com `USER_PASSWORD_AUTH`. Criar o Taskfile com `task local:up`, `local:seed`, `local:reset` e `local:down`; verificar que `task local:up` deixa os três containers saudáveis
-- [ ] 3.2 Criar o seed idempotente: tabelas de cada serviço com as mesmas chaves do CDK, as 12 categorias padrão e os usuários confirmados `admin@local.test` (grupo `admin`) e `cliente@local.test` (grupo `cliente`); verificar no dynamodb-admin e com `aws cognito-idp initiate-auth --endpoint-url http://localhost:9229`
-- [ ] 3.3 Escrever `docs/local.md` com os pré-requisitos (Docker, Go, Node, go-task), as portas, como subir cada repositório localmente, os usuários de teste, onde ver o código de confirmação e as diferenças entre local e nuvem; verificar seguindo os passos num clone limpo
+- [x] 3.1 Criar o `docker-compose.yml` com DynamoDB Local (8000), dynamodb-admin (8001) e cognito-local (9229). O cognito-local replica o User Pool: e-mail como login, política de senha, grupos `admin` e `cliente` e app client sem secret com `USER_PASSWORD_AUTH`. Criar o Taskfile com `task local:up`, `local:seed`, `local:reset` e `local:down`; verificar que `task local:up` deixa os três containers saudáveis
+- [x] 3.2 Criar o seed idempotente: tabelas de cada serviço com as mesmas chaves do CDK, as 12 categorias padrão e os usuários confirmados `admin@local.test` (grupo `admin`) e `cliente@local.test` (grupo `cliente`); verificar no dynamodb-admin e com `aws cognito-idp initiate-auth --endpoint-url http://localhost:9229`
+  - O seed é um programa Go em `local/seed`, que só aceita endpoints locais. As chaves das tabelas definidas nele são o contrato que o CDK de cada serviço deve seguir (ver `docs/local.md`, "Tabelas").
+  - As cores das categorias padrão ainda precisam ser conferidas com os tokens `category/*` do Figma.
+- [x] 3.3 Escrever `docs/local.md` com os pré-requisitos (Docker, Go, Node, go-task), as portas, como subir cada repositório localmente, os usuários de teste, onde ver o código de confirmação e as diferenças entre local e nuvem; verificar seguindo os passos num clone limpo
 
 ## 4. Biblioteca compartilhada (`gestor-gastos-go-commons`)
 

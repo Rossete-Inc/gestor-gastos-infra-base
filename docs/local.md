@@ -120,6 +120,7 @@ Cada repositório documenta o seu próprio comando no README, à medida que as f
 | Grupo após cadastro | O trigger Post Confirmation põe o usuário em `cliente` e publica `UserConfirmed` | Não há trigger: quem se cadastra fica **sem grupo** | O BFF só exige grupo para `admin`, então um usuário sem grupo funciona como cliente. O perfil nasce sob demanda no `/me` |
 | E-mail de confirmação | Enviado pelo Cognito | Código no log (`task local:logs`) | — |
 | Validade do access token | 15 min | 15 min (o emulador respeita) | — |
+| Resposta do login | Traz `TokenType` e `ExpiresIn` | Só `AccessToken`, `IdToken` e `RefreshToken` | O front calcula a expiração pelo claim `exp` do JWT, e não por `ExpiresIn` |
 | Operações de admin no Cognito | Todas | Algumas não existem no emulador | Adaptador fake atrás da mesma interface (tarefa 10.1) |
 | EventBridge | Barramento real com DLQ | POST direto aos consumidores em `LOCAL_EVENT_TARGETS` | Sem retentativa nem DLQ localmente |
 | IDs do User Pool | Fixos no SSM | Mudam a cada reset | Releia `local/.env.cognito` após um reset |
