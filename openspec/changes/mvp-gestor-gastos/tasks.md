@@ -33,7 +33,7 @@
 ## 4. Biblioteca compartilhada (`gestor-gastos-go-commons`)
 
 - [x] 4.1 Criar o módulo `github.com/Rossete-Inc/gestor-gastos-go-commons` com os pacotes `auth` (claims, validação de JWT por JWKS configurável), `errs` (erros tipados → problem+json), `logging` (slog JSON sem PII) e `config` (`RUNTIME=local|aws`); testes unitários com cobertura ≥ 80%
-- [ ] 4.2 Criar o pacote `invoke` (envelope operação + payload + userId) com dois transportes atrás da mesma interface: Lambda Invoke (aws) e HTTP (local); testes dos dois transportes com servidor e client fakes
+- [x] 4.2 Criar o pacote `invoke` (envelope operação + payload + userId) com dois transportes atrás da mesma interface: Lambda Invoke (aws) e HTTP (local); testes dos dois transportes com servidor e client fakes
 - [ ] 4.3 Criar o pacote `events` com dois publishers: EventBridge (aws) e local, que faz POST aos consumidores de `LOCAL_EVENT_TARGETS`; testes cobrindo fan-out e falha de um consumidor
 - [ ] 4.4 Incluir helpers de paginação com cursor assinado por HMAC e de soma em centavos; testes cobrindo cursor adulterado e somas sem perda de precisão
 - [ ] 4.5 Criar a esteira só de testes (GitHub Actions, sem AWS) e publicar a tag `v0.1.0`; verificar com `go list -m github.com/Rossete-Inc/gestor-gastos-go-commons@v0.1.0`
