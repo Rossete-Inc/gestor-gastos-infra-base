@@ -40,7 +40,7 @@
 
 ## 5. Fatia 1 — Autenticação e perfil (local)
 
-- [ ] 5.1 users-service: domínio de perfil, papéis e máquina de estados do ciclo de vida, store DynamoDB com GSI de listagem, consumidor idempotente de `UserConfirmed` e operação `ObterPerfil`/`CriarPerfil`; testes unitários e de integração com DynamoDB Local
+- [x] 5.1 users-service: domínio de perfil, papéis e máquina de estados do ciclo de vida, store DynamoDB com GSI de listagem, consumidor idempotente de `UserConfirmed` e operação `ObterPerfil`/`CriarPerfil`; testes unitários e de integração com DynamoDB Local
 - [ ] 5.2 users-service: `cmd/local` (servidor HTTP chamando o mesmo handler da Lambda); verificar com `curl` no ambiente local
 - [ ] 5.3 BFF: escrever o `openapi.yaml` completo (`/me`, `/telas/dashboard`, `/telas/gastos`, `/telas/gasto-form`, `/gastos`, `/categorias`, `/admin/telas/usuarios`, `/admin/usuarios/{id}`) com erros problem+json; verificar com lint do OpenAPI (Spectral) no CI
 - [ ] 5.4 BFF: validação do JWT (JWKS do cognito-local ou do Cognito), extração do `userId` e dos grupos, checagem de `admin` em `/admin/*`, `/me` com criação do perfil sob demanda e `cmd/local`; testes cobrindo 401, 403 e perfil ausente

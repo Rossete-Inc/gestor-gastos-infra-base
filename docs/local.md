@@ -42,6 +42,9 @@ Os dois comandos são idempotentes e podem ser rodados de novo a qualquer moment
 | dynamodb-admin (navegador) | http://localhost:8001 |
 | cognito-local | http://localhost:9229 |
 | BFF (`cmd/local`) | http://localhost:8080 (a confirmar na tarefa 5.4) |
+| users-service (`cmd/local`) | http://127.0.0.1:8082 |
+| categories-service (`cmd/local`) | http://127.0.0.1:8083 (reservada para a tarefa 7.2) |
+| expenses-service (`cmd/local`) | http://127.0.0.1:8084 (reservada para a tarefa 8.2) |
 | Expo web | http://localhost:8081 |
 
 ## IDs do Cognito local
