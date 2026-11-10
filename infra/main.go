@@ -8,6 +8,7 @@
 // Stacks do ambiente (contexto `env`, padrão dev), na ordem de deploy:
 //   - gestor-gastos-<env>-events: barramento do EventBridge e DLQ dos consumidores.
 //   - gestor-gastos-<env>-auth: User Pool, grupos, app client e trigger Post Confirmation.
+//   - gestor-gastos-<env>-web: app do Amplify Hosting (PWA), sem repositório conectado.
 //   - gestor-gastos-<env>-api: HTTP API com authorizer JWT, CORS e throttling.
 //
 // Elas se comunicam só pelo SSM (/gestor-gastos/<env>/...), nunca por exports.
@@ -48,6 +49,7 @@ func NovoApp(app awscdk.App, dirLambda string) {
 		Ambiente:               env,
 		CodigoPostConfirmation: CodigoLambda(dirLambda),
 	})
+	web := NovaStackWeb(app, NomeStack(env, "web"), env, props)
 	api := NovaStackApi(app, NomeStack(env, "api"), &ApiProps{
 		StackProps:    *props,
 		Ambiente:      env,
@@ -55,9 +57,10 @@ func NovoApp(app awscdk.App, dirLambda string) {
 	})
 
 	// Só ordem de deploy (o trigger publica no barramento; a api lê o SSM da
-	// auth). AddStackDependency não cria exports.
+	// auth e da web). AddStackDependency não cria exports.
 	auth.AddStackDependency(events, jsii.String("o trigger publica no barramento"))
 	api.AddStackDependency(auth, jsii.String("o authorizer lê o issuer e o client id do SSM"))
+	api.AddStackDependency(web, jsii.String("o CORS lê a URL do site no SSM"))
 }
 
 // Ambiente lê o contexto `env` (padrão dev) e aceita só os de Ambientes.

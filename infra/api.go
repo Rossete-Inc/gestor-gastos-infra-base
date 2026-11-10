@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	// ChaveContextoOrigemAmplify é a chave de contexto com a origem do site no
-	// Amplify (ex.: https://main.d1abc.amplifyapp.com), liberada no CORS. O app
-	// do Amplify só existe a partir da tarefa 6.6; até lá, só o localhost.
-	// Depois, grave o valor em infra/cdk.json para todo deploy usá-lo.
+	// ChaveContextoOrigemAmplify é a chave de contexto que sobrescreve a origem
+	// do site liberada no CORS (ex.: https://app.exemplo.com, se um dia houver
+	// domínio próprio). Sem ela, a origem é a URL do Amplify que a stack web
+	// publica no SSM (ParamFrontendURL), resolvida no deploy.
 	ChaveContextoOrigemAmplify = "amplifyOrigin"
 
 	// VarAmbienteOrigemAmplify é a alternativa ao contexto.
@@ -40,7 +40,8 @@ const (
 type ApiProps struct {
 	awscdk.StackProps
 	Ambiente string
-	// OrigemAmplify é a origem extra liberada no CORS, além de OrigemLocal. Vazia = só o localhost.
+	// OrigemAmplify é a origem do site liberada no CORS, além de OrigemLocal.
+	// Vazia = a URL publicada pela stack web no SSM (ParamFrontendURL).
 	OrigemAmplify string
 }
 
@@ -68,13 +69,14 @@ func NovaStackApi(scope constructs.Construct, id string, props *ApiProps) awscdk
 	stack := awscdk.NewStack(scope, jsii.String(id), &props.StackProps)
 	env := props.Ambiente
 
-	origens := []string{OrigemLocal}
-	if props.OrigemAmplify != "" {
-		if !origemValida(props.OrigemAmplify) {
-			awscdk.Annotations_Of(stack).AddError(jsii.String(MsgOrigemAmplifyInvalida))
-		}
-		origens = append(origens, props.OrigemAmplify)
+	origemSite := props.OrigemAmplify
+	if origemSite == "" {
+		// Resolvida no deploy: a stack web precisa estar implantada antes.
+		origemSite = lerParametro(stack, env, ParamFrontendURL)
+	} else if !origemValida(origemSite) {
+		awscdk.Annotations_Of(stack).AddError(jsii.String(MsgOrigemAmplifyInvalida))
 	}
+	origens := []string{OrigemLocal, origemSite}
 
 	issuer := lerParametro(stack, env, ParamIssuerURL)
 	clientID := lerParametro(stack, env, ParamUserPoolClientID)

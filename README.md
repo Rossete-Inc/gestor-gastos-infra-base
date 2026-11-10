@@ -10,6 +10,7 @@ Todos os repositórios do sistema ficam na organização GitHub [Rossete-Inc](ht
 - `docs/diagramas.md`: diagramas Mermaid (arquitetura, fluxos, telas, dados, deploy).
 - `docs/adr/`: decisões de arquitetura transversais.
 - `docs/local.md` e `local/`: ambiente local (DynamoDB Local, dynamodb-admin, cognito-local e seed). Para subir: `task local:up` e depois `task local:seed`.
+- `docs/primeiro-admin.md`: criação do primeiro administrador em dev, pelo CLI.
 - `.github/workflows/`: workflows reutilizáveis da esteira (`go-service.yml`, `frontend.yml`), usados por todos os repositórios. Como chamar e o que configurar: `docs/workflows.md`.
 - `infra/`: AWS CDK (Go) com stack `cicd` (OIDC + roles de deploy), Cognito (+ trigger), API Gateway HTTP API + authorizer JWT, barramento EventBridge e AWS Budget.
 - `cmd/post-confirmation` e `internal/postconfirmation`: Lambda Go do trigger Post Confirmation do Cognito (grupo `cliente` + evento `UserConfirmed`). Os IDs são publicados no SSM Parameter Store em `/gestor-gastos/<env>/...`. Comandos e deploy inicial em [`infra/README.md`](infra/README.md).
