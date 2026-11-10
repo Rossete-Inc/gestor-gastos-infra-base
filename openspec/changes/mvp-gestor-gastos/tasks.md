@@ -53,17 +53,19 @@
 
 ## 6. Base na nuvem + deploy da fatia 1 (após 5.8)
 
-- [ ] 6.1 Instalar o AWS CDK e rodar `cdk bootstrap` em us-east-1; verificar a stack `CDKToolkit` no CloudFormation
-- [ ] 6.2 infra-base: stack `cicd` com o OIDC provider do GitHub e roles `gh-deploy-<repo>-dev` com trust `repo:Rossete-Inc/<repo>:environment:dev`, roles só leitura `gh-diff-<repo>` para o `cdk diff` com trust `repo:Rossete-Inc/<repo>:pull_request`, e stack `budget` com US$ 5 e alertas a 80% do real e 100% do previsto; testes de assertion do CDK e deploy local único
-- [ ] 6.3 infra-base: workflows reutilizáveis `go-service.yml` (vet, golangci-lint, test, build arm64, synth/diff no PR, checagem de "Validado localmente", deploy em `dev` na `main` com environment, `concurrency` por repositório) e `frontend.yml` (tsc, eslint, jest, boundaries, `expo export -p web`, `amplify create-deployment`); verificar com `actionlint` e rodando no próprio infra-base
+- [x] 6.1 Instalar o AWS CDK e rodar `cdk bootstrap` em us-east-1; verificar a stack `CDKToolkit` no CloudFormation
+  - Bootstrap na conta 363218498905 em 2026-11-10.
+- [x] 6.2 infra-base: stack `cicd` com o OIDC provider do GitHub e roles `gh-deploy-<repo>-dev` com trust `repo:Rossete-Inc/<repo>:environment:dev`, roles só leitura `gh-diff-<repo>` para o `cdk diff` com trust `repo:Rossete-Inc/<repo>:pull_request`, e stack `budget` com US$ 5 e alertas a 80% do real e 100% do previsto; testes de assertion do CDK e deploy local único
+  - Stacks `gestor-gastos-cicd` (11 roles) e `gestor-gastos-budget` implantadas à mão em 2026-11-10.
+- [x] 6.3 infra-base: workflows reutilizáveis `go-service.yml` (vet, golangci-lint, test, build arm64, synth/diff no PR, checagem de "Validado localmente", deploy em `dev` na `main` com environment, `concurrency` por repositório) e `frontend.yml` (tsc, eslint, jest, boundaries, `expo export -p web`, `amplify create-deployment`); verificar com `actionlint` e rodando no próprio infra-base
 - [ ] 6.4 infra-base: stacks `auth` (User Pool com SRP, access token de 15 min, grupos), `events` (barramento com DLQ), `api` (HTTP API, authorizer JWT, CORS, throttling), trigger Post Confirmation em Go e parâmetros no SSM; testes de assertion, verificar que uma chamada sem token recebe 401 e `aws ssm get-parameters-by-path`
 - [ ] 6.5 users-service e BFF: CDK (tabela on-demand com RETAIN, Lambda arm64 256 MB com alias `live`, CodeDeploy canary, logs 7 dias, regra do EventBridge, ARNs no SSM, falha clara quando faltar parâmetro); deploy em `dev` pela esteira e smoke test de `GET /me` com token real
 - [ ] 6.6 frontend: Amplify Hosting com rewrite SPA e deploy em `dev`; criar o primeiro admin via CLI e documentar em `docs/`; o usuário repete o roteiro da 5.8 em `dev`
 
 ## 7. Fatia 2 — Categorias
 
-- [ ] 7.1 categories-service: domínio (grupos válidos, padrão imutável, nome único por grupo ignorando caixa, visibilidade por usuário) com testes cobrindo os cenários da spec `categorias`
-- [ ] 7.2 categories-service: store DynamoDB (`PK=SYSTEM|USER#id`, `SK=CAT#grupo#id`), seed idempotente das categorias padrão, handler (ListarCategorias, ObterCategoria, CriarCategoria, ExcluirCategoria), consumidor de `UserDeleted` e `cmd/local`; testes com DynamoDB Local
+- [x] 7.1 categories-service: domínio (grupos válidos, padrão imutável, nome único por grupo ignorando caixa, visibilidade por usuário) com testes cobrindo os cenários da spec `categorias`
+- [x] 7.2 categories-service: store DynamoDB (`PK=SYSTEM|USER#id`, `SK=CAT#grupo#id`), seed idempotente das categorias padrão, handler (ListarCategorias, ObterCategoria, CriarCategoria, ExcluirCategoria), consumidor de `UserDeleted` e `cmd/local`; testes com DynamoDB Local
 - [ ] 7.3 BFF: `/categorias` (GET, POST, DELETE) e `/telas/gasto-form`; testes com clients mockados
 - [ ] 7.4 frontend: feature `categorias` (lista por grupo, criar, excluir personalizada com confirmação); testes com MSW
 - [ ] 7.5 **Validação local pelo usuário:** listar padrão e personalizadas, criar categoria, tentar duplicar o nome, excluir. O usuário aprova
