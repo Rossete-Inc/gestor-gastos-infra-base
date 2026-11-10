@@ -281,12 +281,12 @@ func TestBudgetSemEmailFalhaComMensagemClara(t *testing.T) {
 	assertions.Template_FromStack(stack, nil).ResourceCountIs(jsii.String("AWS::Budgets::Budget"), jsii.Number(0))
 }
 
-func TestAppTemAsDuasStacks(t *testing.T) {
+func TestAppTemTodasAsStacks(t *testing.T) {
 	t.Setenv(VarAmbienteEmailBudget, emailTeste)
 	app := awscdk.NewApp(nil)
-	NovoApp(app)
+	NovoApp(app, dirLambdaFake(t))
 
-	for _, nome := range []string{StackCicd, StackBudget} {
+	for _, nome := range []string{StackCicd, StackBudget, "gestor-gastos-dev-events", "gestor-gastos-dev-auth", "gestor-gastos-dev-api"} {
 		if app.Node().TryFindChild(jsii.String(nome)) == nil {
 			t.Errorf("stack %s não encontrada no app", nome)
 		}

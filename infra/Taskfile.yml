@@ -7,15 +7,31 @@ vars:
   # CLI do CDK com versão fixa, via npx (não precisa de instalação global).
   CDK: npx --yes aws-cdk@2.1148.0
 
+  # Raiz do repositório: módulo Go da Lambda do trigger (./cmd/post-confirmation).
+  RAIZ: "{{.TASKFILE_DIR}}/.."
+
 tasks:
   test:
-    desc: Roda vet e os testes de assertion do CDK (não precisa de AWS)
+    desc: Roda vet e os testes de assertion do CDK e da Lambda do trigger (não precisa de AWS nem de build)
     cmds:
       - go vet ./...
       - go test ./...
+      - go -C "{{.RAIZ}}" vet ./...
+      - go -C "{{.RAIZ}}" test ./...
+
+  build:
+    desc: Compila a Lambda do trigger Post Confirmation (linux/arm64) em dist/post-confirmation/bootstrap
+    env:
+      GOOS: linux
+      GOARCH: arm64
+      CGO_ENABLED: "0"
+    cmds:
+      # Mesmo comando do job de build do go-service.yml.
+      - go -C "{{.RAIZ}}" build -tags lambda.norpc -trimpath -ldflags="-s -w" -o dist/post-confirmation/bootstrap ./cmd/post-confirmation
 
   synth:
-    desc: Gera os templates de todas as stacks em cdk.out (exige BUDGET_EMAIL ou -c budgetEmail=...)
+    desc: Compila a Lambda e gera os templates de todas as stacks em cdk.out (exige BUDGET_EMAIL ou -c budgetEmail=...)
+    deps: [build]
     cmds:
       - "{{.CDK}} synth --quiet {{.CLI_ARGS}}"
 
@@ -25,6 +41,7 @@ tasks:
       - "{{.CDK}} synth gestor-gastos-cicd {{.CLI_ARGS}}"
 
   diff:
-    desc: Mostra a diferença entre o código e a conta (só leitura, precisa de credenciais)
+    desc: Compila a Lambda e mostra a diferença entre o código e a conta (só leitura, precisa de credenciais)
+    deps: [build]
     cmds:
       - "{{.CDK}} diff {{.CLI_ARGS}}"

@@ -1,7 +1,8 @@
 package main
 
 // Convenções compartilhadas pelas stacks do infra-base.
-// As tarefas 6.4 e 6.5 devem reaproveitar estes valores em vez de repetir strings.
+// Todas as stacks (e o CDK dos outros repositórios, como referência) devem
+// reaproveitar estes valores em vez de repetir strings.
 
 const (
 	// Org é a organização GitHub dona de todos os repositórios.
@@ -76,4 +77,59 @@ func SubjectOIDC(repo, env string) string {
 // sem barra final. Ex.: /gestor-gastos/dev.
 func PrefixoSSM(env string) string {
 	return "/" + Projeto + "/" + env
+}
+
+const (
+	// ChaveContextoAmbiente é a chave de contexto do CDK com o ambiente
+	// (`cdk deploy --context env=dev`), a mesma que o go-service.yml passa.
+	ChaveContextoAmbiente = "env"
+
+	// AmbientePadrao é usado quando o contexto `env` não é informado.
+	AmbientePadrao = "dev"
+
+	// SourceAuth é o `source` dos eventos do trigger Post Confirmation. O
+	// users-service filtra a regra do EventBridge por ele.
+	SourceAuth = Projeto + ".auth"
+
+	// GrupoAdmin e GrupoCliente são os grupos do User Pool, iguais aos do
+	// cognito-local (local/seed/cognito.go).
+	GrupoAdmin   = "admin"
+	GrupoCliente = "cliente"
+
+	// OrigemLocal é a origem do `expo start --web`, sempre liberada no CORS.
+	OrigemLocal = "http://localhost:8081"
+)
+
+// Parâmetros publicados no SSM, relativos a PrefixoSSM(env). Os outros
+// repositórios leem estes caminhos; mudar um nome quebra quem consome.
+const (
+	ParamUserPoolID       = "auth/user-pool-id"
+	ParamUserPoolArn      = "auth/user-pool-arn"
+	ParamUserPoolClientID = "auth/user-pool-client-id"
+	ParamIssuerURL        = "auth/issuer-url"
+	ParamJwksURL          = "auth/jwks-url"
+	ParamBusName          = "events/bus-name"
+	ParamBusArn           = "events/bus-arn"
+	ParamDlqArn           = "events/dlq-arn"
+	ParamDlqURL           = "events/dlq-url"
+	ParamAPIID            = "api/id"
+	ParamAPIURL           = "api/url"
+	ParamAuthorizerID     = "api/authorizer-id"
+)
+
+// CaminhoSSM devolve o caminho completo de um parâmetro do ambiente.
+// Ex.: CaminhoSSM("dev", ParamAPIURL) = /gestor-gastos/dev/api/url.
+func CaminhoSSM(env, param string) string {
+	return PrefixoSSM(env) + "/" + param
+}
+
+// NomeStack devolve o nome de uma stack por ambiente. Ex.: gestor-gastos-dev-auth.
+func NomeStack(env, nome string) string {
+	return Projeto + "-" + env + "-" + nome
+}
+
+// NomeBarramento devolve o nome do barramento do EventBridge do ambiente.
+// Ex.: gestor-gastos-dev.
+func NomeBarramento(env string) string {
+	return Projeto + "-" + env
 }
