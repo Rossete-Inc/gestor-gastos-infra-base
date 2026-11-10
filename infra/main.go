@@ -1,7 +1,8 @@
 // Command infra é o app AWS CDK (Go) do gestor-gastos-infra-base.
 //
 // Stacks da conta (não dependem de ambiente):
-//   - gestor-gastos-cicd: OIDC provider do GitHub e roles gh-deploy-<repo>-<env>.
+//   - gestor-gastos-cicd: OIDC provider do GitHub, roles gh-deploy-<repo>-<env> e
+//     roles só leitura gh-diff-<repo> para o cdk diff em PRs.
 //   - gestor-gastos-budget: orçamento mensal de US$ 5 com alertas por e-mail.
 //
 // As stacks por ambiente (auth, events, api) entram na tarefa 6.4, com nomes

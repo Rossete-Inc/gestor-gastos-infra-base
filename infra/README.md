@@ -1,12 +1,12 @@
 # infra (AWS CDK em Go)
 
-App CDK do `gestor-gastos-infra-base`. Região fixa: `us-east-1`. Ambientes `dev` e `prod` ficam na mesma conta, separados pelo prefixo nos nomes e pelo caminho `/gestor-gastos/<env>/...` no SSM. CloudFormation exports nunca são usados ([ADR 0007](../docs/adr/0007-esteira-ci-cd.md)).
+App CDK do `gestor-gastos-infra-base`. Região fixa: `us-east-1`. Por custo, há um único ambiente na AWS, `dev`, implantado a cada push na `main`. Os nomes continuam levando o ambiente (`gestor-gastos-dev-*`, `/gestor-gastos/dev/...` no SSM), então um segundo ambiente no futuro não exige renomear nada. CloudFormation exports nunca são usados ([ADR 0007](../docs/adr/0007-esteira-ci-cd.md)).
 
 ## Stacks
 
 | Stack | Escopo | O que cria |
 |---|---|---|
-| `gestor-gastos-cicd` | conta | OIDC provider do GitHub (`token.actions.githubusercontent.com`, audience `sts.amazonaws.com`) e 12 roles `gh-deploy-<repo>-<env>` |
+| `gestor-gastos-cicd` | conta | OIDC provider do GitHub (`token.actions.githubusercontent.com`, audience `sts.amazonaws.com`) 6 roles de deploy `gh-deploy-<repo>-dev` e 5 roles só leitura `gh-diff-<repo>` |
 | `gestor-gastos-budget` | conta | Budget mensal `gestor-gastos-mensal` de US$ 5, com alerta por e-mail a 80% do custo real e a 100% do previsto |
 
 As stacks por ambiente (auth, events, api) entram na tarefa 6.4.
@@ -25,16 +25,16 @@ Os testes e o synth rodam sem credenciais. Nesse caso a stack fica agnóstica de
 
 ## Roles de deploy
 
-Uma role por repositório implantável e ambiente:
+Uma role de deploy por repositório implantável e uma role só leitura, para o `cdk diff` em PRs, por repositório que usa CDK:
 
-| Repositório | dev | prod |
+| Repositório | Deploy (`dev`) | `cdk diff` em PR |
 |---|---|---|
-| `gestor-gastos-infra-base` | `gh-deploy-gestor-gastos-infra-base-dev` | `gh-deploy-gestor-gastos-infra-base-prod` |
-| `gestor-gastos-users-service` | `gh-deploy-gestor-gastos-users-service-dev` | `gh-deploy-gestor-gastos-users-service-prod` |
-| `gestor-gastos-categories-service` | `gh-deploy-gestor-gastos-categories-service-dev` | `gh-deploy-gestor-gastos-categories-service-prod` |
-| `gestor-gastos-expenses-service` | `gh-deploy-gestor-gastos-expenses-service-dev` | `gh-deploy-gestor-gastos-expenses-service-prod` |
-| `gestor-gastos-bff` | `gh-deploy-gestor-gastos-bff-dev` | `gh-deploy-gestor-gastos-bff-prod` |
-| `gestor-gastos-frontend` | `gh-deploy-gestor-gastos-frontend-dev` | `gh-deploy-gestor-gastos-frontend-prod` |
+| `gestor-gastos-infra-base` | `gh-deploy-gestor-gastos-infra-base-dev` | `gh-diff-gestor-gastos-infra-base` |
+| `gestor-gastos-users-service` | `gh-deploy-gestor-gastos-users-service-dev` | `gh-diff-gestor-gastos-users-service` |
+| `gestor-gastos-categories-service` | `gh-deploy-gestor-gastos-categories-service-dev` | `gh-diff-gestor-gastos-categories-service` |
+| `gestor-gastos-expenses-service` | `gh-deploy-gestor-gastos-expenses-service-dev` | `gh-diff-gestor-gastos-expenses-service` |
+| `gestor-gastos-bff` | `gh-deploy-gestor-gastos-bff-dev` | `gh-diff-gestor-gastos-bff` |
+| `gestor-gastos-frontend` | `gh-deploy-gestor-gastos-frontend-dev` | (sem CDK) |
 
 ARN: `arn:aws:iam::<conta>:role/gh-deploy-<repo>-<env>`. O nome é previsível, então os workflows montam o ARN a partir de uma variável `AWS_ACCOUNT_ID` do GitHub, sem depender de saída de stack.
 
@@ -43,7 +43,7 @@ ARN: `arn:aws:iam::<conta>:role/gh-deploy-<repo>-<env>`. O nome é previsível, 
 - `token.actions.githubusercontent.com:aud` = `sts.amazonaws.com`
 - `token.actions.githubusercontent.com:sub` = `repo:Rossete-Inc/<repo>:environment:<env>`
 
-O GitHub só emite esse `sub` quando o job declara `environment: dev` ou `environment: prod`. Um job sem environment, de outro repositório ou de outro ambiente não consegue assumir a role. A regra de que `dev` só aceita a `main` e `prod` só aceita tags `v*.*.*` fica nas regras de deployment dos GitHub Environments.
+O GitHub só emite esse `sub` quando o job declara `environment: dev`. Um job sem environment ou de outro repositório não consegue assumir a role. A regra de que `dev` só aceita a `main` fica nas regras de deployment do GitHub Environment.
 
 **Permissões.** Todas as roles recebem só:
 
@@ -52,7 +52,19 @@ O GitHub só emite esse `sub` quando o job declara `environment: dev` ou `enviro
 
 A role do **frontend** recebe também permissões no Amplify Hosting, porque o site não é publicado pelo CDK: a esteira envia o build do `expo export -p web` com `aws amplify create-deployment` e `start-deployment` e acompanha o job. As ações são `amplify:CreateDeployment`, `StartDeployment`, `GetApp`, `GetBranch`, `GetJob`, `ListJobs` e `StopJob`, em `arn:aws:amplify:us-east-1:<conta>:apps/*`. O escopo é `apps/*` porque o app só será criado na tarefa 6.6. Depois disso dá para restringir ao app id.
 
-**Limite conhecido.** As roles de `dev` e de `prod` assumem as mesmas roles `cdk-*` do bootstrap, que têm poder de administrador via CloudFormation. Na mesma conta, a separação entre ambientes vem da trust por environment e das regras dos GitHub Environments, não do IAM. Contas separadas ficam para quando houver usuários reais (ADR 0007).
+**Limite conhecido.** As roles de deploy assumem as roles `cdk-*` do bootstrap, que têm poder de administrador via CloudFormation. O que protege a conta é a trust por environment somada à regra do Environment `dev` (só a `main`, que é protegida e exige PR).
+
+### Roles de `cdk diff`
+
+O job de `cdk diff` roda em PRs de qualquer branch, então não pode usar a role de deploy. Cada repositório com CDK tem uma role `gh-diff-<repo>` com trust em `sub` = `repo:Rossete-Inc/<repo>:pull_request`, o valor que o GitHub emite para um job de `pull_request` **sem** `environment:`. PRs de fork não recebem token OIDC.
+
+Permissões, todas de leitura:
+
+- `sts:AssumeRole` e `sts:TagSession` só em `cdk-*-lookup-role-*`, a role do bootstrap com `ReadOnlyAccess`. As roles de deploy e de publicação de assets ficam de fora.
+- `cloudformation:DescribeStacks` e `GetTemplate` nas stacks `gestor-gastos-*`.
+- Leitura do SSM em `/gestor-gastos/*` e `/cdk-bootstrap/*`.
+
+Por isso o diff roda com `cdk diff --method=template`: comparar por change set exigiria a role de deploy.
 
 ## Deploy local único da stack cicd
 
@@ -73,7 +85,7 @@ Feito **uma única vez por conta**, por um admin, depois do `cdk bootstrap` (tar
    npx --yes aws-cdk@2.1148.0 diff gestor-gastos-cicd
    ```
 
-3. Faça o deploy. O CDK mostra as mudanças de IAM e pede confirmação; confira as 12 roles e o OIDC provider antes de aceitar:
+3. Faça o deploy. O CDK mostra as mudanças de IAM e pede confirmação; confira as 11 roles (6 de deploy e 5 de diff) e o OIDC provider antes de aceitar:
 
    ```sh
    npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-cicd
@@ -85,11 +97,11 @@ Feito **uma única vez por conta**, por um admin, depois do `cdk bootstrap` (tar
 
    ```sh
    aws iam list-open-id-connect-providers
-   aws iam list-roles --query "Roles[?starts_with(RoleName, 'gh-deploy-')].RoleName"
+   aws iam list-roles --query "Roles[?starts_with(RoleName, 'gh-')].RoleName"
    aws iam get-role --role-name gh-deploy-gestor-gastos-users-service-dev --query "Role.AssumeRolePolicyDocument"
    ```
 
-5. No GitHub, crie a variável `AWS_ACCOUNT_ID` na organização Rossete-Inc e os Environments `dev` (só a branch `main`) e `prod` (só tags `v*.*.*`, com aprovação) em cada repositório implantável.
+5. No GitHub, crie a variável `AWS_ACCOUNT_ID` na organização Rossete-Inc e o Environment `dev` (regra de deployment: só a branch `main`) em cada repositório implantável.
 
 ### Stack budget
 
@@ -102,7 +114,7 @@ npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-budget -c budgetEmail=voce@exemp
 BUDGET_EMAIL=voce@exemplo.com npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-budget
 ```
 
-Na esteira, o e-mail vem de uma variável do GitHub Environment (`BUDGET_EMAIL`).
+Na esteira, o e-mail vem da variável `BUDGET_EMAIL` do GitHub Environment `dev`.
 
 ## Convenções para as próximas stacks
 
