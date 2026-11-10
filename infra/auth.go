@@ -147,9 +147,11 @@ func NovaStackAuth(scope constructs.Construct, id string, props *AuthProps) awsc
 	// Client público (o app roda no navegador): sem secret, só SRP e refresh.
 	// Sem OAuth/Hosted UI: o login é feito pelo próprio app.
 	client := pool.AddClient(jsii.String("AppClient"), &awscognito.UserPoolClientOptions{
-		UserPoolClientName:         jsii.String(NomeStack(env, "frontend")),
-		GenerateSecret:             jsii.Bool(false),
-		AuthFlows:                  &awscognito.AuthFlow{UserSrp: jsii.Bool(true)},
+		UserPoolClientName: jsii.String(NomeStack(env, "frontend")),
+		GenerateSecret:     jsii.Bool(false),
+		// AdminUserPassword só é aceito com credenciais IAM (AdminInitiateAuth):
+		// serve ao smoke test da esteira e não abre nada para o app público.
+		AuthFlows:                  &awscognito.AuthFlow{UserSrp: jsii.Bool(true), AdminUserPassword: jsii.Bool(true)},
 		DisableOAuth:               jsii.Bool(true),
 		PreventUserExistenceErrors: jsii.Bool(true),
 		EnableTokenRevocation:      jsii.Bool(true),

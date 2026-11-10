@@ -21,8 +21,8 @@ Tags `vX.Y.Z` não fazem deploy. A `go-commons` continua publicando tags semver,
 
 - **Concorrência:** o job de deploy usa o grupo `deploy-<repo>-dev`, com `cancel-in-progress: false`. Um deploy novo espera o anterior terminar, sem cancelá-lo.
 - **Credenciais:** OIDC na conta `vars.AWS_ACCOUNT_ID`, região `us-east-1`. O `<repo>` vem de `github.event.repository.name`. Nenhum segredo é usado.
-  - **Deploy:** role `gh-deploy-<repo>-dev`, cuja trust aceita só `repo:Rossete-Inc/<repo>:environment:dev`. Por isso o job de deploy usa o Environment `dev`.
-  - **`cdk diff` no PR:** role só leitura `gh-diff-<repo>`, cuja trust aceita só `repo:Rossete-Inc/<repo>:pull_request`. É o `sub` que o GitHub emite em `pull_request` para um job **sem** `environment:`, por isso o job de diff não usa Environment. A role só assume a lookup role do bootstrap do CDK (`cdk-*-lookup-role-*`) e lê templates do CloudFormation e o SSM `/gestor-gastos/*`. Sem permissão para criar change set, o diff roda com `--method=template`, comparando com o template implantado.
+  - **Deploy:** role `gh-deploy-<repo>-dev`, cuja trust aceita só `repo:Rossete-Inc@339323229/<repo>@<repo-id>:environment:dev`. Por isso o job de deploy usa o Environment `dev`.
+  - **`cdk diff` no PR:** role só leitura `gh-diff-<repo>`, cuja trust aceita só `repo:Rossete-Inc@339323229/<repo>@<repo-id>:pull_request`. É o `sub` que o GitHub emite em `pull_request` para um job **sem** `environment:`, por isso o job de diff não usa Environment. A role só assume a lookup role do bootstrap do CDK (`cdk-*-lookup-role-*`) e lê templates do CloudFormation e o SSM `/gestor-gastos/*`. Sem permissão para criar change set, o diff roda com `--method=template`, comparando com o template implantado.
 - **Validado localmente:** o job reprova o PR que tenha **Funcionalidade** ou **Correção** marcada (ou nenhum tipo marcado) sem `- [x] Validado localmente` no corpo. PR só de **Infraestrutura / CI** ou **Documentação** fica dispensado. Para o job rodar de novo quando o corpo é editado, inclua `edited` nos `types` do `pull_request`.
 
 ## Serviço Go
