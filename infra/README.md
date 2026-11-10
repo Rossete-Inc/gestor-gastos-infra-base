@@ -89,7 +89,7 @@ ARN: `arn:aws:iam::<conta>:role/gh-deploy-<repo>-<env>`. O nome é previsível, 
 **Trust policy.** Ação `sts:AssumeRoleWithWebIdentity` vinda do OIDC provider, com `StringEquals` exato em duas claims:
 
 - `token.actions.githubusercontent.com:aud` = `sts.amazonaws.com`
-- `token.actions.githubusercontent.com:sub` = `repo:Rossete-Inc/<repo>:environment:<env>`
+- `token.actions.githubusercontent.com:sub` = `repo:Rossete-Inc@339323229/<repo>@<repo-id>:environment:<env>`
 
 O GitHub só emite esse `sub` quando o job declara `environment: dev`. Um job sem environment ou de outro repositório não consegue assumir a role. A regra de que `dev` só aceita a `main` fica nas regras de deployment do GitHub Environment.
 
@@ -104,7 +104,9 @@ A role do **frontend** recebe também permissões no Amplify Hosting, porque o s
 
 ### Roles de `cdk diff`
 
-O job de `cdk diff` roda em PRs de qualquer branch, então não pode usar a role de deploy. Cada repositório com CDK tem uma role `gh-diff-<repo>` com trust em `sub` = `repo:Rossete-Inc/<repo>:pull_request`, o valor que o GitHub emite para um job de `pull_request` **sem** `environment:`. PRs de fork não recebem token OIDC.
+O job de `cdk diff` roda em PRs de qualquer branch, então não pode usar a role de deploy. Cada repositório com CDK tem uma role `gh-diff-<repo>` com trust em `sub` = `repo:Rossete-Inc@339323229/<repo>@<repo-id>:pull_request`, o valor que o GitHub emite para um job de `pull_request` **sem** `environment:`. PRs de fork não recebem token OIDC.
+
+**Formato do `sub`.** Os repositórios da Rossete-Inc emitem a claim no formato de subject imutável do GitHub (`use_immutable_subject: true`, conferir com `gh api repos/Rossete-Inc/<repo>/actions/oidc/customization/sub`): `repo:Rossete-Inc@339323229/<repo>@<repo-id>:...`. O id da org e os ids dos repositórios ficam em `infra/config.go` (`OrgID` e `RepoIDs`). Um repositório novo precisa entrar ali antes de ganhar role.
 
 Permissões, todas de leitura:
 

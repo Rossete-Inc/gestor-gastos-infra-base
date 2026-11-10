@@ -8,6 +8,14 @@ const (
 	// Org é a organização GitHub dona de todos os repositórios.
 	Org = "Rossete-Inc"
 
+	// OrgID é o id numérico da organização. Entra na claim `sub` do OIDC porque os
+	// repositórios usam o formato de subject imutável do GitHub
+	// (`repo:<org>@<org-id>/<repo>@<repo-id>:...`), que não muda com renomeações.
+	OrgID = "339323229"
+
+	// RepoBff é o repositório do BFF, cuja role de deploy roda o smoke test.
+	RepoBff = "gestor-gastos-bff"
+
 	// Projeto é o prefixo usado em nomes de stacks e recursos.
 	Projeto = "gestor-gastos"
 
@@ -55,10 +63,33 @@ func NomeRoleDiff(repo string) string {
 	return "gh-diff-" + repo
 }
 
+// RepoIDs são os ids numéricos dos repositórios no GitHub, usados na claim `sub`.
+// Conferir com `gh api repos/Rossete-Inc/<repo> -q .id`.
+var RepoIDs = map[string]string{
+	"gestor-gastos-infra-base":         "1447342519",
+	"gestor-gastos-go-commons":         "1447342613",
+	"gestor-gastos-users-service":      "1447342682",
+	"gestor-gastos-categories-service": "1447342754",
+	"gestor-gastos-expenses-service":   "1447342815",
+	RepoBff:                            "1447342889",
+	RepoFrontend:                       "1447342977",
+}
+
+// prefixoSubject devolve o início imutável da claim `sub` de um repositório.
+// Entra em pânico se o id não estiver em RepoIDs: melhor falhar no synth do que
+// gerar uma trust que nenhum token satisfaz.
+func prefixoSubject(repo string) string {
+	id, ok := RepoIDs[repo]
+	if !ok {
+		panic("RepoIDs não tem o id do repositório " + repo)
+	}
+	return "repo:" + Org + "@" + OrgID + "/" + repo + "@" + id
+}
+
 // SubjectOIDCPullRequest é a claim `sub` que o GitHub emite para jobs de
 // pull_request sem `environment:`.
 func SubjectOIDCPullRequest(repo string) string {
-	return "repo:" + Org + "/" + repo + ":pull_request"
+	return prefixoSubject(repo) + ":pull_request"
 }
 
 // NomeRoleDeploy devolve o nome da role de deploy de um repositório em um ambiente.
@@ -70,7 +101,7 @@ func NomeRoleDeploy(repo, env string) string {
 // SubjectOIDC devolve o valor exato da claim `sub` aceita na trust policy.
 // O GitHub só emite esse formato quando o job declara `environment: <env>`.
 func SubjectOIDC(repo, env string) string {
-	return "repo:" + Org + "/" + repo + ":environment:" + env
+	return prefixoSubject(repo) + ":environment:" + env
 }
 
 // PrefixoSSM devolve o caminho base dos parâmetros de um ambiente no SSM,

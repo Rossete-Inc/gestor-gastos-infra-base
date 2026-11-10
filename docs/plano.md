@@ -98,7 +98,7 @@ Todo deploy na AWS é automático, feito pelo **GitHub Actions + AWS CDK**. Ning
 | Pull request | Go: `go vet`, `golangci-lint`, `go test`, build arm64, `cdk synth` + `cdk diff` comentado no PR. Front: `tsc`, `eslint`, `jest`, `check_boundaries.py`. BFF: lint do `openapi.yaml` | Nenhum deploy |
 | Merge na `main` | Build + `cdk deploy` + canary CodeDeploy nas Lambdas + smoke test | **dev** automático |
 
-- **Credenciais:** OIDC do GitHub na AWS, sem access keys. Cada repositório tem a role de deploy `gh-deploy-<repo>-dev`, com trust restrita a `repo:Rossete-Inc/<repo>:environment:dev`, e a role só leitura `gh-diff-<repo>` para o `cdk diff` do PR, com trust `repo:Rossete-Inc/<repo>:pull_request`.
+- **Credenciais:** OIDC do GitHub na AWS, sem access keys. Cada repositório tem a role de deploy `gh-deploy-<repo>-dev`, com trust restrita a `repo:Rossete-Inc@339323229/<repo>@<repo-id>:environment:dev`, e a role só leitura `gh-diff-<repo>` para o `cdk diff` do PR, com trust `repo:Rossete-Inc@339323229/<repo>@<repo-id>:pull_request`.
 - **Bootstrap (único passo manual, uma vez por conta):** `cdk bootstrap` + deploy local da stack `cicd` do infra-base, que cria o OIDC provider e as roles.
 - **Workflows reutilizáveis** no infra-base (`.github/workflows/go-service.yml`, `frontend.yml`), chamados pelos outros repositórios por tag.
 - **Rollback:** Lambdas publicadas por alias `live`. O deploy usa `Canary10Percent5Minutes` e volta automaticamente se o alarme de erros do CloudWatch disparar.

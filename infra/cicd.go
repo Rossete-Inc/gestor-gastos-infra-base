@@ -96,6 +96,25 @@ func novaRoleDeploy(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo, e
 		}))
 	}
 
+	// O smoke test do BFF (scripts/smoke.sh no gestor-gastos-bff) roda com esta
+	// role depois do deploy: garante o usuário smoke-test@example.com, troca a
+	// senha por uma aleatória e pede um token com ADMIN_USER_PASSWORD_AUTH para
+	// chamar GET /me. O pool é lido do SSM, por isso o escopo é userpool/* da conta.
+	if repo == RepoBff {
+		role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+			Sid: jsii.String("SmokeTestNoCognito"),
+			Actions: jsii.Strings(
+				"cognito-idp:AdminGetUser",
+				"cognito-idp:AdminCreateUser",
+				"cognito-idp:AdminSetUserPassword",
+				"cognito-idp:AdminInitiateAuth",
+			),
+			Resources: jsii.Strings(
+				"arn:" + *awscdk.Aws_PARTITION() + ":cognito-idp:" + *awscdk.Aws_REGION() + ":" + *awscdk.Aws_ACCOUNT_ID() + ":userpool/*",
+			),
+		}))
+	}
+
 	// Saída informativa (sem exportName: nunca usamos CloudFormation exports).
 	awscdk.NewCfnOutput(stack, jsii.String(nome+"-arn"), &awscdk.CfnOutputProps{
 		Value:       role.RoleArn(),

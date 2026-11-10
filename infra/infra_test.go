@@ -72,7 +72,7 @@ func TestCicdTrustDaRoleDeDev(t *testing.T) {
 
 	tpl.HasResourceProperties(jsii.String("AWS::IAM::Role"), map[string]interface{}{
 		"RoleName":                 "gh-deploy-gestor-gastos-users-service-dev",
-		"AssumeRolePolicyDocument": assertions.Match_ObjectEquals(trustEsperada("repo:Rossete-Inc/gestor-gastos-users-service:environment:dev")),
+		"AssumeRolePolicyDocument": assertions.Match_ObjectEquals(trustEsperada("repo:Rossete-Inc@339323229/gestor-gastos-users-service@1447342682:environment:dev")),
 	})
 }
 
@@ -93,7 +93,7 @@ func TestCicdRoleDeDiffPorRepositorioComCdk(t *testing.T) {
 	for _, repo := range ReposComCdk {
 		tpl.HasResourceProperties(jsii.String("AWS::IAM::Role"), map[string]interface{}{
 			"RoleName":                 NomeRoleDiff(repo),
-			"AssumeRolePolicyDocument": assertions.Match_ObjectEquals(trustEsperada("repo:Rossete-Inc/" + repo + ":pull_request")),
+			"AssumeRolePolicyDocument": assertions.Match_ObjectEquals(trustEsperada("repo:Rossete-Inc@339323229/" + repo + "@" + RepoIDs[repo] + ":pull_request")),
 		})
 	}
 

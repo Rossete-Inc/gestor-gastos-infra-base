@@ -248,7 +248,7 @@ func TestAuthAppClientPublicoComSrpETokensCurtos(t *testing.T) {
 	tpl.HasResourceProperties(jsii.String("AWS::Cognito::UserPoolClient"), map[string]interface{}{
 		"ClientName":                      "gestor-gastos-dev-frontend",
 		"GenerateSecret":                  false,
-		"ExplicitAuthFlows":               assertions.Match_ArrayEquals(&[]interface{}{"ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"}),
+		"ExplicitAuthFlows":               assertions.Match_ArrayEquals(&[]interface{}{"ALLOW_ADMIN_USER_PASSWORD_AUTH", "ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"}),
 		"AllowedOAuthFlowsUserPoolClient": false,
 		"PreventUserExistenceErrors":      "ENABLED",
 		"EnableTokenRevocation":           true,
