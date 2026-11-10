@@ -4,3 +4,6 @@ includes:
   local:
     taskfile: ./local/Taskfile.yml
     dir: ./local
+  infra:
+    taskfile: ./infra/Taskfile.yml
+    dir: ./infra
