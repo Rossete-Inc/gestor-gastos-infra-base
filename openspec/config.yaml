@@ -20,7 +20,7 @@ context: |
   - DynamoDB on-demand, uma tabela por serviço, valores em centavos int64 (ADR 0002).
   - Cognito (grupos admin/cliente), API Gateway HTTP API com authorizer JWT, EventBridge.
   - Front: Expo + React Native + Expo Router, PWA no Amplify (skill app-multiplataforma-guardrails).
-  - CI/CD: GitHub Actions + CDK + OIDC; merge na main -> dev, tag -> prod com aprovação (ADR 0007).
+  - CI/CD: GitHub Actions + CDK + OIDC; merge na main -> dev, ambiente único na AWS (ADR 0007).
   - Custo mínimo: preferir serverless e free tier.
 
 # Per-artifact rules (optional)

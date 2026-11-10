@@ -3,9 +3,11 @@
 # Gatilhos (decididos pelo workflow que chama, ver docs/workflows.md):
 #   - pull_request: validação local marcada, qualidade, build arm64, cdk synth + cdk diff contra dev (comentado no PR)
 #   - push na main: qualidade, build e deploy em dev + smoke test
-#   - push de tag vX.Y.Z: qualidade, build e deploy em prod (aprovação no Environment prod) + smoke test
 #
-# Credenciais: OIDC, role gh-deploy-<repo>-<env> na conta vars.AWS_ACCOUNT_ID. Nenhum segredo.
+# A AWS tem um ambiente só, dev (ADR 0007). Tags vX.Y.Z não fazem deploy.
+# Credenciais: OIDC na conta vars.AWS_ACCOUNT_ID, nenhum segredo.
+#   - cdk diff (PR): role só leitura gh-diff-<repo>, sem Environment do GitHub
+#   - deploy (main): role gh-deploy-<repo>-dev, Environment dev
 name: go-service
 
 on:
@@ -60,7 +62,7 @@ on:
       smoke-test:
         description: >-
           Comando bash rodado na raiz do repositório após cada deploy, com as credenciais do ambiente
-          e a variável AMBIENTE (dev ou prod). Vazio = sem smoke test.
+          e a variável AMBIENTE (sempre dev). Vazio = sem smoke test.
         type: string
         default: ""
       exigir-validacao-local:
@@ -210,8 +212,9 @@ jobs:
       needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # A trust da role aceita só repo:<org>/<repo>:environment:<env>, por isso o job usa o Environment dev.
-    environment: dev
+    # Sem `environment:` de propósito: assim o sub do token OIDC é repo:<org>/<repo>:pull_request,
+    # o único aceito pela trust da role só leitura gh-diff-<repo> (stack cicd). Ela só assume a
+    # lookup role do bootstrap do CDK e lê templates do CloudFormation e o SSM /gestor-gastos/*.
     permissions:
       contents: read
       id-token: write
@@ -237,7 +240,7 @@ jobs:
           path: ${{ inputs.dist-dir }}
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-dev
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-diff-${{ github.event.repository.name }}
           aws-region: ${{ env.AWS_REGION }}
       - name: cdk synth
         working-directory: ${{ inputs.cdk-dir }}
@@ -246,10 +249,12 @@ jobs:
           npx --yes "aws-cdk@$CDK_VERSION" synth --all --context "env=$AMBIENTE" $CDK_ARGS > /dev/null
       - name: cdk diff
         working-directory: ${{ inputs.cdk-dir }}
+        # --method=template compara com o template implantado, sem criar change set
+        # (criar change set exigiria a role de deploy).
         run: |
           set -o pipefail
           # shellcheck disable=SC2086
-          npx --yes "aws-cdk@$CDK_VERSION" diff --all --context "env=$AMBIENTE" $CDK_ARGS 2>&1 | tee "$RUNNER_TEMP/cdk-diff.txt"
+          npx --yes "aws-cdk@$CDK_VERSION" diff --all --method=template --context "env=$AMBIENTE" $CDK_ARGS 2>&1 | tee "$RUNNER_TEMP/cdk-diff.txt"
       - name: Comenta o diff no PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -278,35 +283,25 @@ jobs:
           fi
 
   deploy:
-    # Um job só para os dois ambientes: main -> dev, tag vX.Y.Z -> prod.
-    name: Deploy em ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+    # Ambiente único: push na main -> dev, sem aprovação manual (o Environment dev só aceita a main).
+    name: Deploy em dev
     needs: [qualidade, build]
-    if: >-
-      github.event_name == 'push' && inputs.cdk-dir != '' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && inputs.cdk-dir != ''
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Em prod, a aprovação manual vem das regras de proteção do Environment.
-    environment: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+    environment: dev
     concurrency:
-      group: deploy-${{ github.event.repository.name }}-${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      group: deploy-${{ github.event.repository.name }}-dev
       cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
     env:
-      AMBIENTE: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      AMBIENTE: dev
       CDK_VERSION: ${{ inputs.cdk-version }}
       CDK_ARGS: ${{ inputs.cdk-args }}
       SMOKE_TEST: ${{ inputs.smoke-test }}
     steps:
-      - name: Tag no formato vX.Y.Z
-        if: env.AMBIENTE == 'prod'
-        run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::A tag '$GITHUB_REF_NAME' não segue vX.Y.Z; prod só recebe tags semânticas."
-            exit 1
-          fi
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
@@ -322,7 +317,7 @@ jobs:
           path: ${{ inputs.dist-dir }}
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-${{ env.AMBIENTE }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-dev
           aws-region: ${{ env.AWS_REGION }}
       - name: cdk deploy
         working-directory: ${{ inputs.cdk-dir }}

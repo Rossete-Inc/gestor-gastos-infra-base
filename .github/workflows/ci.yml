@@ -14,7 +14,7 @@
 #       lambdas: ./cmd/post-confirmation   # trigger do Cognito (tarefa 6.4)
 #       cdk-dir: infra
 #
-# (e com "tags: ['v*.*.*']" no "on: push" para o deploy em prod). A stack cicd continua
+# O deploy em dev sai do push na main (ambiente único, ADR 0007). A stack cicd continua
 # com deploy local, feito por um admin: é ela que cria as roles que a esteira assume.
 name: ci
 

@@ -96,14 +96,13 @@ Todo deploy na AWS é automático, feito pelo **GitHub Actions + AWS CDK**. Ning
 | Gatilho | O que roda | Destino |
 |---|---|---|
 | Pull request | Go: `go vet`, `golangci-lint`, `go test`, build arm64, `cdk synth` + `cdk diff` comentado no PR. Front: `tsc`, `eslint`, `jest`, `check_boundaries.py`. BFF: lint do `openapi.yaml` | Nenhum deploy |
-| Merge na `main` | Build + `cdk deploy` + smoke test | **dev** automático |
-| Tag `vX.Y.Z` | Mesmo artefato + `cdk deploy` + canary CodeDeploy nas Lambdas | **prod**, com aprovação manual |
+| Merge na `main` | Build + `cdk deploy` + canary CodeDeploy nas Lambdas + smoke test | **dev** automático |
 
-- **Credenciais:** OIDC do GitHub na AWS, sem access keys. Cada repositório tem uma role por ambiente (`gh-deploy-<repo>-<env>`), com trust restrita a `repo:Rossete-Inc/<repo>:environment:<env>`.
+- **Credenciais:** OIDC do GitHub na AWS, sem access keys. Cada repositório tem a role de deploy `gh-deploy-<repo>-dev`, com trust restrita a `repo:Rossete-Inc/<repo>:environment:dev`, e a role só leitura `gh-diff-<repo>` para o `cdk diff` do PR, com trust `repo:Rossete-Inc/<repo>:pull_request`.
 - **Bootstrap (único passo manual, uma vez por conta):** `cdk bootstrap` + deploy local da stack `cicd` do infra-base, que cria o OIDC provider e as roles.
 - **Workflows reutilizáveis** no infra-base (`.github/workflows/go-service.yml`, `frontend.yml`), chamados pelos outros repositórios por tag.
-- **Rollback:** Lambdas publicadas por alias `live`. Em prod, o deploy usa `Canary10Percent5Minutes` e volta automaticamente se o alarme de erros do CloudWatch disparar.
-- **Ambientes:** dev e prod na mesma conta, separados por prefixo e por caminho no SSM. Um `concurrency` group por ambiente evita deploys simultâneos.
+- **Rollback:** Lambdas publicadas por alias `live`. O deploy usa `Canary10Percent5Minutes` e volta automaticamente se o alarme de erros do CloudWatch disparar.
+- **Ambiente único:** só `dev`, em us-east-1, com recursos prefixados e parâmetros em `/gestor-gastos/dev/` no SSM. Tags `vX.Y.Z` não fazem deploy. É um projeto de estudo e precisa ficar barato; um segundo ambiente fica para uma decisão futura. Um `concurrency` group por repositório evita deploys simultâneos.
 - **Casos específicos:** `go-commons` só testa e publica a tag. O frontend faz `expo export -p web` e deploy no Amplify via `aws amplify create-deployment`.
 
 ## Design no Figma

@@ -64,7 +64,8 @@ O `openapi.yaml` (BFF) é escrito primeiro e validado com lint no CI. O front ge
 - **Datas:** `AAAA-MM-DD` sem fuso. O mês corrente é calculado no fuso do dispositivo.
 
 ### Repositórios públicos e região
-- **Repositórios:** os sete repositórios da Rossete-Inc são **públicos**. A org está no plano GitHub Free, que em repositório privado não oferece proteção de branch nem Environments, e a aprovação obrigatória (required reviewers) em repositório privado só existe no Enterprise. Como públicos, eles têm proteção da `main`, Environments `dev`/`prod` com aprovação em `prod` e trust OIDC por environment sem custo. Também dispensam o `GOPRIVATE` e o token de leitura para baixar a `go-commons`, e os minutos do Actions são ilimitados. Nenhum segredo fica no código: o deploy usa OIDC, e a configuração fica no SSM. Decisão tomada em 2026-11-05.
+- **Repositórios:** os sete repositórios da Rossete-Inc são **públicos**. A org está no plano GitHub Free, que em repositório privado não oferece proteção de branch nem Environments, e a aprovação obrigatória (required reviewers) em repositório privado só existe no Enterprise. Como públicos, eles têm proteção da `main`, Environments e trust OIDC por environment sem custo. Também dispensam o `GOPRIVATE` e o token de leitura para baixar a `go-commons`, e os minutos do Actions são ilimitados. Nenhum segredo fica no código: o deploy usa OIDC, e a configuração fica no SSM. Decisão tomada em 2026-11-05.
+- **Ambiente único:** a AWS tem um só ambiente, `dev`, implantado a cada merge na `main` (Environment `dev`, restrito à `main`, sem aprovação manual). Tags `vX.Y.Z` não fazem deploy; a `go-commons` continua publicando tags semver como biblioteca. O motivo é custo: é um projeto de estudo. Um segundo ambiente fica para uma decisão futura (ADR 0007). Decisão tomada em 2026-11-10.
 - **Região:** toda a infraestrutura fica em **us-east-1**. É a região mais barata e com todos os serviços. A latência a partir do Brasil, de cerca de 120 ms, é aceitável para o MVP. `sa-east-1` custaria de 30% a 50% mais.
 
 ### Execução local e entrega em fatias
@@ -93,7 +94,7 @@ Cada funcionalidade roda e é validada localmente pelo responsável antes de sub
 - **Alternativa descartada:** LocalStack, porque Cognito e outros serviços usados só existem na versão paga, e um ambiente local ainda mais fiel não compensa o custo.
 
 ### Retenção de logs
-O plano previa 7 dias para tudo. Esta change define 7 dias em `dev` e 30 dias em `prod`, para dar tempo de investigar incidentes. O custo é desprezível com o volume do MVP.
+Os logs ficam 7 dias em `dev`, o único ambiente na nuvem. A versão anterior desta change previa 30 dias para `prod`, que deixou de existir em 2026-11-10.
 
 ## Risks / Trade-offs
 
@@ -102,13 +103,13 @@ O plano previa 7 dias para tudo. Esta change define 7 dias em `dev` e 30 dias em
 - [Cold start em rotas pouco usadas] → Go em arm64 com 256 MB. Provisioned concurrency só se o p95 incomodar, pois tem custo.
 - [Evento `UserConfirmed` perdido deixaria usuário sem perfil] → DLQ no target do EventBridge, e o BFF cria o perfil sob demanda no `/me` se ele não existir (operação idempotente).
 - [Exclusão de usuário assíncrona] → consumidores idempotentes com DLQ e alarme na DLQ.
-- [O emulador local diverge do Cognito real (SRP, triggers, operações de admin)] → mesma interface com adaptadores trocáveis, smoke test em `dev` a cada fatia e E2E em `dev` antes de `prod`.
+- [O emulador local diverge do Cognito real (SRP, triggers, operações de admin)] → mesma interface com adaptadores trocáveis, smoke test em `dev` a cada fatia e E2E em `dev` ao fim do MVP.
 - [Manter dois transportes (HTTP local e Lambda)] → o transporte fica isolado na `go-commons` e coberto por testes, e o handler é único.
-- [Código público expõe a arquitetura e os nomes dos recursos] → nenhum segredo em código ou workflow, OIDC com trust restrita a `repo:Rossete-Inc/<repo>:environment:<env>`, `.env.local` no `.gitignore` e IDs de recursos lidos do SSM.
+- [Código público expõe a arquitetura e os nomes dos recursos] → nenhum segredo em código ou workflow, OIDC com trust restrita a `repo:Rossete-Inc/<repo>:environment:dev` no deploy e a `repo:Rossete-Inc/<repo>:pull_request` na role só leitura do `cdk diff`, `.env.local` no `.gitignore` e IDs de recursos lidos do SSM.
 
 ## Migration Plan
 
-Não há dados nem sistema anterior. Primeira implantação de um ambiente:
+Não há dados nem sistema anterior. Primeira implantação do ambiente `dev`:
 
 0. Ambiente local (`task local:up`) e fatia 1 validada localmente pelo responsável.
 1. Bootstrap manual: `cdk bootstrap` e deploy local da stack `cicd`.
@@ -116,7 +117,7 @@ Não há dados nem sistema anterior. Primeira implantação de um ambiente:
 3. Criação do primeiro admin via CLI (`AdminCreateUser` + grupo `admin`).
 4. Cada fatia seguinte passa por validação local e merge, que implanta em `dev`. A ordem é categories → expenses (gastos e painel) → admin no users-service, e em cada uma o BFF e o frontend são implantados junto.
 
-Rollback: canary com rollback automático nas Lambdas. Para infraestrutura, reverter o commit gera um novo deploy pela esteira. As tabelas DynamoDB usam `RemovalPolicy.RETAIN` em `prod`.
+Rollback: canary com rollback automático nas Lambdas. Para infraestrutura, reverter o commit gera um novo deploy pela esteira. As tabelas DynamoDB usam `RemovalPolicy.RETAIN`.
 
 ## Open Questions
 

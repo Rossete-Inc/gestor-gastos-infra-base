@@ -3,7 +3,8 @@
 # Gatilhos (decididos pelo workflow que chama, ver docs/workflows.md):
 #   - pull_request: validação local marcada, tsc, eslint, prettier, fronteiras, jest e expo export -p web
 #   - push na main: as mesmas verificações e deploy em dev no Amplify + smoke test
-#   - push de tag vX.Y.Z: as mesmas verificações e deploy em prod (aprovação no Environment prod) + smoke test
+#
+# A AWS tem um ambiente só, dev (ADR 0007). Tags vX.Y.Z não fazem deploy.
 #
 # O deploy é "manual" do ponto de vista do Amplify (app sem repositório conectado):
 # create-deployment -> upload do zip -> start-deployment -> espera o job terminar.
@@ -39,12 +40,12 @@ on:
           EXPO_PUBLIC_COGNITO_ENDPOINT=http://localhost:9229
       env-ssm:
         description: >-
-          Linhas NOME=/caminho/no/ssm lidas antes do build de deploy; {env} vira dev ou prod
+          Linhas NOME=/caminho/no/ssm lidas antes do build de deploy; {env} vira dev
           (ex. "EXPO_PUBLIC_API_URL=/gestor-gastos/{env}/api/url"). Parâmetro ausente reprova o deploy.
         type: string
         default: ""
       env-deploy:
-        description: Linhas NOME=valor fixas do build de deploy; {env} vira dev ou prod.
+        description: Linhas NOME=valor fixas do build de deploy; {env} vira dev.
         type: string
         default: |
           EXPO_PUBLIC_APP_ENV={env}
@@ -55,7 +56,7 @@ on:
         default: dist
       amplify-app-id-ssm:
         description: >-
-          Parâmetro do SSM com o id do app no Amplify; {env} vira dev ou prod.
+          Parâmetro do SSM com o id do app no Amplify; {env} vira dev.
           Ignorado se a variável AMPLIFY_APP_ID existir no Environment do GitHub.
         type: string
         default: /gestor-gastos/{env}/frontend/amplify-app-id
@@ -66,7 +67,7 @@ on:
       smoke-test:
         description: >-
           Comando bash rodado após cada deploy, com as credenciais do ambiente,
-          AMBIENTE (dev ou prod) e APP_URL (URL do Amplify). Vazio = sem smoke test.
+          AMBIENTE (sempre dev) e APP_URL (URL do Amplify). Vazio = sem smoke test.
         type: string
         default: ""
       exigir-validacao-local:
@@ -146,36 +147,26 @@ jobs:
           npx expo export -p web --output-dir "$DIST_DIR"
 
   deploy:
-    # Um job só para os dois ambientes: main -> dev, tag vX.Y.Z -> prod.
-    name: Deploy em ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+    # Ambiente único: push na main -> dev, sem aprovação manual (o Environment dev só aceita a main).
+    name: Deploy em dev
     needs: [verificar]
-    if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Em prod, a aprovação manual vem das regras de proteção do Environment.
     environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      name: dev
       url: ${{ steps.amplify.outputs.url }}
     concurrency:
-      group: deploy-${{ github.event.repository.name }}-${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      group: deploy-${{ github.event.repository.name }}-dev
       cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
     env:
-      AMBIENTE: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      AMBIENTE: dev
       DIST_DIR: ${{ inputs.dist-dir }}
       AMPLIFY_BRANCH: ${{ inputs.amplify-branch }}
     steps:
-      - name: Tag no formato vX.Y.Z
-        if: env.AMBIENTE == 'prod'
-        run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::A tag '$GITHUB_REF_NAME' não segue vX.Y.Z; prod só recebe tags semânticas."
-            exit 1
-          fi
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
@@ -184,7 +175,7 @@ jobs:
       - run: npm ci
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-${{ env.AMBIENTE }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-dev
           aws-region: ${{ env.AWS_REGION }}
       - name: Lê a configuração do ambiente
         env:
