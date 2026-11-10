@@ -6,7 +6,7 @@ Os repositórios do Gestor de Gastos não escrevem a própria esteira: eles cham
 |---|---|---|
 | [`go-service.yml`](../.github/workflows/go-service.yml) | users-service, categories-service, expenses-service, BFF, go-commons e, mais tarde, o próprio infra-base | `go mod tidy`, `gofmt`, `go vet`, `golangci-lint`, `go test` com cobertura, build arm64 das Lambdas, `cdk synth` + `cdk diff` comentado no PR e `cdk deploy` em dev |
 | [`frontend.yml`](../.github/workflows/frontend.yml) | frontend | `tsc`, `eslint`, `prettier`, `check_boundaries.py`, `jest`, `expo export -p web` e deploy no Amplify Hosting |
-| [`ci.yml`](../.github/workflows/ci.yml) | só este repositório | `actionlint` (com `shellcheck`) em todos os workflows e checagem de "Validado localmente" |
+| [`ci.yml`](../.github/workflows/ci.yml) | só este repositório | `actionlint` (com `shellcheck`) em todos os workflows, checagem de "Validado localmente" e `go mod tidy`, `gofmt`, `go vet` e testes da Lambda do trigger e do CDK (`infra/`) |
 
 ## Gatilhos
 
@@ -108,7 +108,7 @@ jobs:
       verificacoes-extras: |
         npm run api:gerar
         git diff --exit-code src/shared/api/generated
-      # Caminhos a confirmar quando a 6.4 publicar os parâmetros:
+      # Publicados pelas stacks api e auth do infra-base (infra/README.md):
       env-ssm: |
         EXPO_PUBLIC_API_URL=/gestor-gastos/{env}/api/url
         EXPO_PUBLIC_COGNITO_CLIENT_ID=/gestor-gastos/{env}/auth/user-pool-client-id
@@ -160,7 +160,9 @@ Se nenhum dos dois existir, o deploy falha com mensagem clara. O deploy segue o 
 
 ## Deploy do próprio infra-base
 
-O `ci.yml` deste repositório ainda não faz deploy, porque o CDK em `infra/` está em construção. Quando estiver pronto, ele ganha um job que chama o próprio `go-service.yml` com `uses: ./.github/workflows/go-service.yml`, como está comentado no topo do `ci.yml`. A stack `cicd` continua com deploy local, feito por um admin, porque é ela que cria as roles que a esteira assume.
+O `ci.yml` deste repositório roda `go vet` e os testes da Lambda do trigger (`cmd/post-confirmation`) e dos testes de assertion do CDK (`infra/`), sem AWS, mas ainda não faz `cdk diff` nem deploy. As stacks `events`, `auth` e `api` são implantadas à mão por um admin, como descrito em [`infra/README.md`](../infra/README.md).
+
+O deploy ainda não chama o `go-service.yml` porque ele faz `cdk deploy --all`, o que inclui as stacks da conta: a `cicd`, que cria as próprias roles que a esteira assume, e a `budget`, que exige o e-mail dos alertas (`BUDGET_EMAIL`, variável que ainda não existe no GitHub). Quando isso for resolvido, o job fica como está comentado no topo do `ci.yml` (`lambdas: ./cmd/post-confirmation`, `cdk-dir: infra`). A Lambda já segue a convenção do `go-service.yml` (`dist/post-confirmation/bootstrap`). A stack `cicd` continua com deploy local, feito por um admin.
 
 ## Verificação local
 

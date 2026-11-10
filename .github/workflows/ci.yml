@@ -1,21 +1,28 @@
 # Esteira do próprio infra-base.
 #
-# Hoje: actionlint (com shellcheck) em todos os workflows, incluindo os reutilizáveis
-# go-service.yml e frontend.yml, e a checagem de "Validado localmente" no PR.
+# Hoje:
+#   - actionlint (com shellcheck) em todos os workflows, incluindo os reutilizáveis
+#     go-service.yml e frontend.yml;
+#   - checagem de "Validado localmente" no PR;
+#   - Go: go mod tidy, gofmt, go vet e testes da Lambda do trigger (raiz) e dos testes
+#     de assertion do CDK (infra/). Sem AWS.
 #
-# Deploy do infra-base: ainda não entra aqui, porque o CDK (infra/) está em construção.
-# Quando estiver pronto, ele entra como um job "infra" chamando o próprio go-service.yml:
+# Deploy do infra-base: ainda manual (infra/README.md). Ainda não chama o go-service.yml porque:
+#   - o go-service.yml roda qualidade e build na raiz e faz `cdk deploy --all`, o que inclui as
+#     stacks da conta: a cicd (que cria as próprias roles da esteira) e a budget (que exige
+#     BUDGET_EMAIL, variável que ainda não existe no GitHub);
+#   - o primeiro deploy das stacks auth/events/api deve ser revisado à mão.
+# Quando isso for resolvido, o job "infra" fica assim:
 #
 #   infra:
 #     uses: ./.github/workflows/go-service.yml
 #     permissions: { contents: read, id-token: write, pull-requests: write }
 #     with:
-#       go-version-file: infra/go.mod
-#       lambdas: ./cmd/post-confirmation   # trigger do Cognito (tarefa 6.4)
+#       lambdas: ./cmd/post-confirmation   # trigger do Cognito -> dist/post-confirmation/bootstrap
 #       cdk-dir: infra
+#       cdk-args: --context budgetEmail=${{ vars.BUDGET_EMAIL }}
 #
-# O deploy em dev sai do push na main (ambiente único, ADR 0007). A stack cicd continua
-# com deploy local, feito por um admin: é ela que cria as roles que a esteira assume.
+# A stack cicd continua com deploy local, feito por um admin: é ela que cria as roles que a esteira assume.
 name: ci
 
 on:
@@ -75,3 +82,39 @@ jobs:
         run: |
           shellcheck --version | head -n 2
           ./actionlint -color
+
+  go:
+    name: Go (vet e testes)
+    # Editar só o corpo do PR não muda o código.
+    if: github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: go mod tidy sem diferenças
+        run: |
+          go mod tidy
+          (cd infra && go mod tidy)
+          git diff --exit-code -- go.mod go.sum infra/go.mod infra/go.sum
+      - name: gofmt
+        run: |
+          fora=$(gofmt -l cmd internal infra)
+          if [ -n "$fora" ]; then
+            echo "::error::Arquivos fora do gofmt:"; echo "$fora"; exit 1
+          fi
+      - name: Lambda do trigger (vet e testes)
+        run: |
+          go vet ./...
+          go test -race -count=1 ./...
+      - name: CDK (vet e testes de assertion)
+        working-directory: infra
+        run: |
+          go vet ./...
+          go test -count=1 ./...
