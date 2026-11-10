@@ -1,0 +1,77 @@
+# Esteira do próprio infra-base.
+#
+# Hoje: actionlint (com shellcheck) em todos os workflows, incluindo os reutilizáveis
+# go-service.yml e frontend.yml, e a checagem de "Validado localmente" no PR.
+#
+# Deploy do infra-base: ainda não entra aqui, porque o CDK (infra/) está em construção.
+# Quando estiver pronto, ele entra como um job "infra" chamando o próprio go-service.yml:
+#
+#   infra:
+#     uses: ./.github/workflows/go-service.yml
+#     permissions: { contents: read, id-token: write, pull-requests: write }
+#     with:
+#       go-version-file: infra/go.mod
+#       lambdas: ./cmd/post-confirmation   # trigger do Cognito (tarefa 6.4)
+#       cdk-dir: infra
+#
+# (e com "tags: ['v*.*.*']" no "on: push" para o deploy em prod). A stack cicd continua
+# com deploy local, feito por um admin: é ela que cria as roles que a esteira assume.
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Editar o corpo do PR não cancela a rodada do código (e vice-versa).
+  group: ci-${{ github.ref }}-${{ github.event.action == 'edited' && 'corpo' || 'codigo' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ACTIONLINT_VERSION: 1.7.12
+
+jobs:
+  validacao-local:
+    name: Validado localmente
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checa o item "Validado localmente" no corpo do PR
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          corpo=$(printf '%s' "$PR_BODY" | tr -d '\r')
+          marcado() { grep -Eiq "^[[:space:]]*[-*][[:space:]]*\[[xX]\][[:space:]]*$1" <<<"$corpo"; }
+          if marcado 'Validado localmente'; then
+            echo "Item \"Validado localmente\" marcado."
+            exit 0
+          fi
+          # O template só exige o item para Funcionalidade e Correção.
+          if ! marcado 'Funcionalidade' && ! marcado 'Corre' && { marcado 'Infraestrutura' || marcado 'Documenta'; }; then
+            echo "::notice title=Validado localmente::PR só de infraestrutura/documentação: item dispensado."
+            exit 0
+          fi
+          echo "::error title=Validado localmente::O corpo do PR precisa ter '- [x] Validado localmente'. Rode o roteiro da fatia com 'task local:up', marque o item no PR e edite o PR para reexecutar."
+          exit 1
+
+  actionlint:
+    name: actionlint
+    # Editar só o corpo do PR não muda os workflows.
+    if: github.event.action != 'edited'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Instala o actionlint
+        run: |
+          bash <(curl -sSfL "https://raw.githubusercontent.com/rhysd/actionlint/v${ACTIONLINT_VERSION}/scripts/download-actionlint.bash") "$ACTIONLINT_VERSION"
+      - name: actionlint (com shellcheck do runner)
+        run: |
+          shellcheck --version | head -n 2
+          ./actionlint -color

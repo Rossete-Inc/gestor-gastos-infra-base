@@ -1,0 +1,334 @@
+# Workflow reutilizável dos repositórios Go (serviços, BFF e go-commons).
+#
+# Gatilhos (decididos pelo workflow que chama, ver docs/workflows.md):
+#   - pull_request: validação local marcada, qualidade, build arm64, cdk synth + cdk diff contra dev (comentado no PR)
+#   - push na main: qualidade, build e deploy em dev + smoke test
+#   - push de tag vX.Y.Z: qualidade, build e deploy em prod (aprovação no Environment prod) + smoke test
+#
+# Credenciais: OIDC, role gh-deploy-<repo>-<env> na conta vars.AWS_ACCOUNT_ID. Nenhum segredo.
+name: go-service
+
+on:
+  workflow_call:
+    inputs:
+      go-version-file:
+        description: Arquivo de onde sai a versão do Go (go.mod ou .go-version).
+        type: string
+        default: go.mod
+      golangci-lint-version:
+        description: Versão do golangci-lint.
+        type: string
+        default: v2.15
+      build-tags:
+        description: Build tags usadas em vet, lint e testes (ex. "integration").
+        type: string
+        default: ""
+      dynamodb-local:
+        description: Sobe o DynamoDB Local (porta 8000) para os testes, com DYNAMODB_ENDPOINT definido.
+        type: boolean
+        default: false
+      min-coverage:
+        description: Cobertura mínima por pacote, em %. 0 desliga a checagem.
+        type: number
+        default: 80
+      lambdas:
+        description: >-
+          Pacotes main das Lambdas, separados por espaço ou quebra de linha (ex. "./cmd/lambda ./cmd/consumidor").
+          Cada um vira <dist-dir>/<nome-da-pasta>/bootstrap (linux/arm64). Vazio = nada para compilar.
+        type: string
+        default: ./cmd/lambda
+      dist-dir:
+        description: Pasta (a partir da raiz do repositório) onde ficam os binários bootstrap lidos pelo CDK.
+        type: string
+        default: dist
+      cdk-dir:
+        description: Pasta do app CDK (Go). Vazio = sem synth, diff e deploy (ex. go-commons).
+        type: string
+        default: infra
+      cdk-version:
+        description: Versão do pacote npm aws-cdk (CLI).
+        type: string
+        default: "2"
+      cdk-args:
+        description: Argumentos extras para cdk synth, diff e deploy (ex. "--context foo=bar").
+        type: string
+        default: ""
+      node-version:
+        description: Versão do Node usada pelo CLI do CDK.
+        type: string
+        default: "24"
+      smoke-test:
+        description: >-
+          Comando bash rodado na raiz do repositório após cada deploy, com as credenciais do ambiente
+          e a variável AMBIENTE (dev ou prod). Vazio = sem smoke test.
+        type: string
+        default: ""
+      exigir-validacao-local:
+        description: Reprova o PR de funcionalidade/correção sem "- [x] Validado localmente" no corpo.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  validacao-local:
+    name: Validado localmente
+    if: github.event_name == 'pull_request' && inputs.exigir-validacao-local
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checa o item "Validado localmente" no corpo do PR
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          corpo=$(printf '%s' "$PR_BODY" | tr -d '\r')
+          marcado() { grep -Eiq "^[[:space:]]*[-*][[:space:]]*\[[xX]\][[:space:]]*$1" <<<"$corpo"; }
+          if marcado 'Validado localmente'; then
+            echo "Item \"Validado localmente\" marcado."
+            exit 0
+          fi
+          # O template só exige o item para Funcionalidade e Correção.
+          if ! marcado 'Funcionalidade' && ! marcado 'Corre' && { marcado 'Infraestrutura' || marcado 'Documenta'; }; then
+            echo "::notice title=Validado localmente::PR só de infraestrutura/documentação: item dispensado."
+            exit 0
+          fi
+          echo "::error title=Validado localmente::O corpo do PR precisa ter '- [x] Validado localmente'. Rode o roteiro da fatia com 'task local:up', marque o item no PR e reexecute este job (ou edite o PR, se o workflow escuta 'edited')."
+          exit 1
+
+  qualidade:
+    name: vet, lint e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # Imagem vazia = o serviço não sobe. Mesma versão do local/docker-compose.yml do infra-base.
+      dynamodb:
+        image: ${{ inputs.dynamodb-local && 'amazon/dynamodb-local:2.6.1' || '' }}
+        ports: ["8000:8000"]
+    env:
+      BUILD_TAGS: ${{ inputs.build-tags }}
+      MIN_COVERAGE: ${{ inputs.min-coverage }}
+      DYNAMODB_ENDPOINT: ${{ inputs.dynamodb-local && 'http://localhost:8000' || '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache-dependency-path: "**/go.sum"
+      - name: go mod tidy sem diferenças
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      - name: gofmt
+        run: |
+          fora=$(gofmt -l .)
+          if [ -n "$fora" ]; then
+            echo "::error::Arquivos fora do gofmt:"; echo "$fora"; exit 1
+          fi
+      - name: go vet
+        run: go vet -tags "$BUILD_TAGS" ./...
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ inputs.golangci-lint-version }}
+          args: ${{ inputs.build-tags != '' && format('--build-tags={0}', inputs.build-tags) || '' }}
+      - name: Espera o DynamoDB Local
+        if: inputs.dynamodb-local
+        run: |
+          for _ in $(seq 30); do
+            curl -s -o /dev/null "$DYNAMODB_ENDPOINT" && exit 0
+            sleep 1
+          done
+          echo "::error::DynamoDB Local não respondeu"; exit 1
+      - name: go test com cobertura
+        run: |
+          set -o pipefail
+          go test -race -count=1 -tags "$BUILD_TAGS" -covermode=atomic -coverprofile=coverage.out ./... | tee test.out
+      - name: Cobertura mínima por pacote
+        run: |
+          {
+            echo "| Pacote | Cobertura |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          falhou=0
+          while read -r pacote pct; do
+            echo "| \`$pacote\` | $pct% |" >> "$GITHUB_STEP_SUMMARY"
+            if awk -v p="$pct" -v m="$MIN_COVERAGE" 'BEGIN { exit !(p < m) }'; then
+              echo "::error::$pacote tem $pct% de cobertura, abaixo de $MIN_COVERAGE%"
+              falhou=1
+            fi
+          done < <(grep -E '^ok' test.out | grep 'coverage:' | sed -E 's/^ok[[:space:]]+([^[:space:]]+).*coverage: ([0-9.]+)%.*/\1 \2/')
+          echo "Total: $(go tool cover -func=coverage.out | tail -1 | awk '{print $3}')" >> "$GITHUB_STEP_SUMMARY"
+          exit $falhou
+
+  build:
+    name: Build arm64 das Lambdas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LAMBDAS: ${{ inputs.lambdas }}
+      DIST_DIR: ${{ inputs.dist-dir }}
+    steps:
+      - uses: actions/checkout@v7
+        if: inputs.lambdas != ''
+      - uses: actions/setup-go@v7
+        if: inputs.lambdas != ''
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache-dependency-path: "**/go.sum"
+      - name: go build (linux/arm64, provided.al2023)
+        if: inputs.lambdas != ''
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: arm64
+        run: |
+          for pacote in $LAMBDAS; do
+            nome=$(basename "$pacote")
+            echo "Compilando $pacote -> $DIST_DIR/$nome/bootstrap"
+            go build -tags lambda.norpc -trimpath -ldflags="-s -w" -o "$DIST_DIR/$nome/bootstrap" "$pacote"
+          done
+      - uses: actions/upload-artifact@v7
+        if: inputs.lambdas != ''
+        with:
+          name: lambdas
+          path: ${{ inputs.dist-dir }}
+          if-no-files-found: error
+          retention-days: 7
+
+  cdk-diff:
+    name: cdk synth e diff (dev)
+    needs: [validacao-local, build]
+    # Sem credencial OIDC em PR vindo de fork: o diff só roda para branches do próprio repositório.
+    # !cancelled(): sem ele, o job seria pulado quando validacao-local é pulado.
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' && inputs.cdk-dir != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (needs.validacao-local.result == 'success' || needs.validacao-local.result == 'skipped') &&
+      needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # A trust da role aceita só repo:<org>/<repo>:environment:<env>, por isso o job usa o Environment dev.
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    env:
+      AMBIENTE: dev
+      CDK_DIR: ${{ inputs.cdk-dir }}
+      CDK_VERSION: ${{ inputs.cdk-version }}
+      CDK_ARGS: ${{ inputs.cdk-args }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache-dependency-path: "**/go.sum"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+      - uses: actions/download-artifact@v8
+        if: inputs.lambdas != ''
+        with:
+          name: lambdas
+          path: ${{ inputs.dist-dir }}
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-dev
+          aws-region: ${{ env.AWS_REGION }}
+      - name: cdk synth
+        working-directory: ${{ inputs.cdk-dir }}
+        run: |
+          # shellcheck disable=SC2086 # CDK_ARGS pode ter vários argumentos
+          npx --yes "aws-cdk@$CDK_VERSION" synth --all --context "env=$AMBIENTE" $CDK_ARGS > /dev/null
+      - name: cdk diff
+        working-directory: ${{ inputs.cdk-dir }}
+        run: |
+          set -o pipefail
+          # shellcheck disable=SC2086
+          npx --yes "aws-cdk@$CDK_VERSION" diff --all --context "env=$AMBIENTE" $CDK_ARGS 2>&1 | tee "$RUNNER_TEMP/cdk-diff.txt"
+      - name: Comenta o diff no PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          marcador="<!-- cdk-diff:dev -->"
+          comentario="$RUNNER_TEMP/comentario.md"
+          {
+            echo "$marcador"
+            echo "### \`cdk diff\` contra dev"
+            echo
+            echo "Commit \`$SHA\`."
+            echo
+            echo '```diff'
+            head -c 60000 "$RUNNER_TEMP/cdk-diff.txt"
+            echo
+            echo '```'
+          } > "$comentario"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marcador\")) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F "body=@$comentario" > /dev/null
+          else
+            gh pr comment "$PR" -R "$GITHUB_REPOSITORY" --body-file "$comentario"
+          fi
+
+  deploy:
+    # Um job só para os dois ambientes: main -> dev, tag vX.Y.Z -> prod.
+    name: Deploy em ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+    needs: [qualidade, build]
+    if: >-
+      github.event_name == 'push' && inputs.cdk-dir != '' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Em prod, a aprovação manual vem das regras de proteção do Environment.
+    environment: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+    concurrency:
+      group: deploy-${{ github.event.repository.name }}-${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AMBIENTE: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      CDK_VERSION: ${{ inputs.cdk-version }}
+      CDK_ARGS: ${{ inputs.cdk-args }}
+      SMOKE_TEST: ${{ inputs.smoke-test }}
+    steps:
+      - name: Tag no formato vX.Y.Z
+        if: env.AMBIENTE == 'prod'
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::A tag '$GITHUB_REF_NAME' não segue vX.Y.Z; prod só recebe tags semânticas."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ inputs.go-version-file }}
+          cache-dependency-path: "**/go.sum"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+      - uses: actions/download-artifact@v8
+        if: inputs.lambdas != ''
+        with:
+          name: lambdas
+          path: ${{ inputs.dist-dir }}
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-${{ env.AMBIENTE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: cdk deploy
+        working-directory: ${{ inputs.cdk-dir }}
+        run: |
+          # shellcheck disable=SC2086 # CDK_ARGS pode ter vários argumentos
+          npx --yes "aws-cdk@$CDK_VERSION" deploy --all --require-approval never --context "env=$AMBIENTE" $CDK_ARGS
+      - name: Smoke test
+        if: inputs.smoke-test != ''
+        run: bash -euo pipefail -c "$SMOKE_TEST"

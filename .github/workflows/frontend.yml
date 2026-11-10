@@ -1,0 +1,267 @@
+# Workflow reutilizável do frontend (Expo, web hospedada no Amplify Hosting).
+#
+# Gatilhos (decididos pelo workflow que chama, ver docs/workflows.md):
+#   - pull_request: validação local marcada, tsc, eslint, prettier, fronteiras, jest e expo export -p web
+#   - push na main: as mesmas verificações e deploy em dev no Amplify + smoke test
+#   - push de tag vX.Y.Z: as mesmas verificações e deploy em prod (aprovação no Environment prod) + smoke test
+#
+# O deploy é "manual" do ponto de vista do Amplify (app sem repositório conectado):
+# create-deployment -> upload do zip -> start-deployment -> espera o job terminar.
+name: frontend
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Versão do Node.
+        type: string
+        default: "24"
+      python-version:
+        description: Versão do Python para o scripts/check_boundaries.py.
+        type: string
+        default: "3.12"
+      verificacoes-extras:
+        description: >-
+          Comandos bash extras rodados depois do npm ci, antes dos testes
+          (ex. checar se o client gerado do BFF está em dia).
+        type: string
+        default: ""
+      env-build-pr:
+        description: >-
+          Linhas NOME=valor usadas no expo export de verificação (PR e antes do deploy).
+          Não vão para a AWS; servem só para a validação de config do app passar.
+        type: string
+        default: |
+          EXPO_PUBLIC_APP_ENV=local
+          EXPO_PUBLIC_API_URL=http://127.0.0.1:8080
+          EXPO_PUBLIC_COGNITO_REGION=us-east-1
+          EXPO_PUBLIC_COGNITO_CLIENT_ID=ci
+          EXPO_PUBLIC_COGNITO_ENDPOINT=http://localhost:9229
+      env-ssm:
+        description: >-
+          Linhas NOME=/caminho/no/ssm lidas antes do build de deploy; {env} vira dev ou prod
+          (ex. "EXPO_PUBLIC_API_URL=/gestor-gastos/{env}/api/url"). Parâmetro ausente reprova o deploy.
+        type: string
+        default: ""
+      env-deploy:
+        description: Linhas NOME=valor fixas do build de deploy; {env} vira dev ou prod.
+        type: string
+        default: |
+          EXPO_PUBLIC_APP_ENV={env}
+          EXPO_PUBLIC_COGNITO_REGION=us-east-1
+      dist-dir:
+        description: Pasta de saída do expo export.
+        type: string
+        default: dist
+      amplify-app-id-ssm:
+        description: >-
+          Parâmetro do SSM com o id do app no Amplify; {env} vira dev ou prod.
+          Ignorado se a variável AMPLIFY_APP_ID existir no Environment do GitHub.
+        type: string
+        default: /gestor-gastos/{env}/frontend/amplify-app-id
+      amplify-branch:
+        description: Branch do app no Amplify que recebe o deploy.
+        type: string
+        default: main
+      smoke-test:
+        description: >-
+          Comando bash rodado após cada deploy, com as credenciais do ambiente,
+          AMBIENTE (dev ou prod) e APP_URL (URL do Amplify). Vazio = sem smoke test.
+        type: string
+        default: ""
+      exigir-validacao-local:
+        description: Reprova o PR de funcionalidade/correção sem "- [x] Validado localmente" no corpo.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  validacao-local:
+    name: Validado localmente
+    if: github.event_name == 'pull_request' && inputs.exigir-validacao-local
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checa o item "Validado localmente" no corpo do PR
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          corpo=$(printf '%s' "$PR_BODY" | tr -d '\r')
+          marcado() { grep -Eiq "^[[:space:]]*[-*][[:space:]]*\[[xX]\][[:space:]]*$1" <<<"$corpo"; }
+          if marcado 'Validado localmente'; then
+            echo "Item \"Validado localmente\" marcado."
+            exit 0
+          fi
+          # O template só exige o item para Funcionalidade e Correção.
+          if ! marcado 'Funcionalidade' && ! marcado 'Corre' && { marcado 'Infraestrutura' || marcado 'Documenta'; }; then
+            echo "::notice title=Validado localmente::PR só de infraestrutura/documentação: item dispensado."
+            exit 0
+          fi
+          echo "::error title=Validado localmente::O corpo do PR precisa ter '- [x] Validado localmente'. Rode o roteiro da fatia com 'task local:up', marque o item no PR e reexecute este job (ou edite o PR, se o workflow escuta 'edited')."
+          exit 1
+
+  verificar:
+    name: tsc, eslint, fronteiras, jest e expo export
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ inputs.python-version }}
+      - run: npm ci
+      - name: tsc
+        run: npm run typecheck
+      - name: eslint
+        run: npm run lint
+      - name: prettier
+        run: npm run format:check --if-present
+      - name: check_boundaries.py
+        run: npm run check:boundaries
+      - name: Verificações extras
+        if: inputs.verificacoes-extras != ''
+        env:
+          VERIFICACOES: ${{ inputs.verificacoes-extras }}
+        run: bash -euo pipefail -c "$VERIFICACOES"
+      - name: jest
+        run: npm run test:ci
+      - name: expo export -p web
+        env:
+          ENV_BUILD: ${{ inputs.env-build-pr }}
+          DIST_DIR: ${{ inputs.dist-dir }}
+        run: |
+          set -a
+          # shellcheck disable=SC1090 # linhas NOME=valor vindas do input
+          source <(grep -Ev '^[[:space:]]*(#|$)' <<<"$ENV_BUILD")
+          set +a
+          npx expo export -p web --output-dir "$DIST_DIR"
+
+  deploy:
+    # Um job só para os dois ambientes: main -> dev, tag vX.Y.Z -> prod.
+    name: Deploy em ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+    needs: [verificar]
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Em prod, a aprovação manual vem das regras de proteção do Environment.
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      url: ${{ steps.amplify.outputs.url }}
+    concurrency:
+      group: deploy-${{ github.event.repository.name }}-${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AMBIENTE: ${{ github.ref == 'refs/heads/main' && 'dev' || 'prod' }}
+      DIST_DIR: ${{ inputs.dist-dir }}
+      AMPLIFY_BRANCH: ${{ inputs.amplify-branch }}
+    steps:
+      - name: Tag no formato vX.Y.Z
+        if: env.AMBIENTE == 'prod'
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::A tag '$GITHUB_REF_NAME' não segue vX.Y.Z; prod só recebe tags semânticas."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/gh-deploy-${{ github.event.repository.name }}-${{ env.AMBIENTE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Lê a configuração do ambiente
+        env:
+          APP_ID_VAR: ${{ vars.AMPLIFY_APP_ID }}
+          APP_ID_SSM: ${{ inputs.amplify-app-id-ssm }}
+          ENV_SSM: ${{ inputs.env-ssm }}
+          ENV_DEPLOY: ${{ inputs.env-deploy }}
+        run: |
+          ler_ssm() {
+            aws ssm get-parameter --name "$1" --query Parameter.Value --output text 2>/dev/null
+          }
+          falhou=0
+
+          app_id="$APP_ID_VAR"
+          if [ -z "$app_id" ]; then
+            caminho="${APP_ID_SSM//'{env}'/$AMBIENTE}"
+            if ! app_id=$(ler_ssm "$caminho") || [ -z "$app_id" ]; then
+              echo "::error::Parâmetro $caminho não existe no SSM (nem a variável AMPLIFY_APP_ID no Environment $AMBIENTE). Faça o deploy do CDK do frontend antes."
+              falhou=1
+            fi
+          fi
+          echo "AMPLIFY_APP_ID=$app_id" >> "$GITHUB_ENV"
+
+          while IFS='=' read -r nome valor; do
+            nome=$(xargs <<<"$nome")
+            [[ -z "$nome" || "$nome" == \#* ]] && continue
+            echo "$nome=${valor//'{env}'/$AMBIENTE}" >> "$GITHUB_ENV"
+          done <<<"$ENV_DEPLOY"
+
+          while IFS='=' read -r nome caminho; do
+            nome=$(xargs <<<"$nome")
+            [[ -z "$nome" || "$nome" == \#* ]] && continue
+            caminho=$(xargs <<<"${caminho//'{env}'/$AMBIENTE}")
+            if ! valor=$(ler_ssm "$caminho") || [ -z "$valor" ]; then
+              echo "::error::Parâmetro $caminho ($nome) não existe no SSM. Faça antes o deploy de quem o publica."
+              falhou=1
+              continue
+            fi
+            echo "$nome=$valor" >> "$GITHUB_ENV"
+          done <<<"$ENV_SSM"
+          exit $falhou
+      - name: expo export -p web
+        run: npx expo export -p web --output-dir "$DIST_DIR"
+      - name: Deploy no Amplify
+        id: amplify
+        run: |
+          (cd "$DIST_DIR" && zip -qr "$RUNNER_TEMP/site.zip" .)
+          read -r job_id upload_url < <(aws amplify create-deployment \
+            --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" \
+            --query '[jobId, zipUploadUrl]' --output text)
+          if [ -z "${upload_url:-}" ]; then
+            echo "::error::create-deployment falhou. Confira se o app $AMPLIFY_APP_ID tem a branch '$AMPLIFY_BRANCH' no Amplify."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X PUT -H "Content-Type: application/zip" \
+            --upload-file "$RUNNER_TEMP/site.zip" "$upload_url"
+          aws amplify start-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$job_id" > /dev/null
+          echo "Job $job_id iniciado; aguardando o Amplify."
+          for _ in $(seq 120); do
+            status=$(aws amplify get-job --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" \
+              --job-id "$job_id" --query 'job.summary.status' --output text)
+            case "$status" in
+              SUCCEED) break ;;
+              FAILED|CANCELLED) echo "::error::Deploy do Amplify terminou com status $status (job $job_id)."; exit 1 ;;
+            esac
+            sleep 5
+          done
+          if [ "$status" != "SUCCEED" ]; then
+            echo "::error::Deploy do Amplify não terminou em 10 minutos (job $job_id, status $status)."
+            exit 1
+          fi
+          url="https://${AMPLIFY_BRANCH//\//-}.$AMPLIFY_APP_ID.amplifyapp.com"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "APP_URL=$url" >> "$GITHUB_ENV"
+          echo "Deploy em **$AMBIENTE**: $url (job $job_id)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke test
+        if: inputs.smoke-test != ''
+        env:
+          SMOKE_TEST: ${{ inputs.smoke-test }}
+        run: bash -euo pipefail -c "$SMOKE_TEST"
