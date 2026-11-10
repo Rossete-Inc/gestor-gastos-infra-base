@@ -1,0 +1,30 @@
+version: "3"
+
+# App AWS CDK (Go) do infra-base. Use pela raiz: `task infra:test` etc.
+# Detalhes em infra/README.md. Nenhuma task aqui faz deploy.
+
+vars:
+  # CLI do CDK com versão fixa, via npx (não precisa de instalação global).
+  CDK: npx --yes aws-cdk@2.1148.0
+
+tasks:
+  test:
+    desc: Roda vet e os testes de assertion do CDK (não precisa de AWS)
+    cmds:
+      - go vet ./...
+      - go test ./...
+
+  synth:
+    desc: Gera os templates de todas as stacks em cdk.out (exige BUDGET_EMAIL ou -c budgetEmail=...)
+    cmds:
+      - "{{.CDK}} synth --quiet {{.CLI_ARGS}}"
+
+  synth:cicd:
+    desc: Gera só o template da stack cicd (não precisa do e-mail do budget)
+    cmds:
+      - "{{.CDK}} synth gestor-gastos-cicd {{.CLI_ARGS}}"
+
+  diff:
+    desc: Mostra a diferença entre o código e a conta (só leitura, precisa de credenciais)
+    cmds:
+      - "{{.CDK}} diff {{.CLI_ARGS}}"
