@@ -18,7 +18,7 @@ A conta AWS SHALL ter um orçamento mensal de US$ 5,00 que envia alerta por e-ma
 - **THEN** os responsáveis recebem um e-mail de alerta
 
 ### Requirement: Retenção de logs limitada
-Os logs das funções MUST ser retidos por no máximo 7 dias em `dev` e 30 dias em `prod`.
+Os logs das funções MUST ser retidos por no máximo 7 dias no ambiente `dev`, o único na nuvem.
 
 #### Scenario: Log antigo
 - **WHEN** um log de uma função em `dev` completa 8 dias

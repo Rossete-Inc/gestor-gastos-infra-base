@@ -364,7 +364,7 @@ erDiagram
 
 ## 12. CI/CD e ordem de deploy
 
-Todo deploy na AWS é automático (ADR 0007). A ordem só importa no primeiro deploy de um ambiente, por causa dos parâmetros no SSM.
+Todo deploy na AWS é automático (ADR 0007). A nuvem tem um ambiente só, `dev`, e tags não fazem deploy. A ordem só importa no primeiro deploy, por causa dos parâmetros no SSM.
 
 ```mermaid
 flowchart LR
@@ -372,17 +372,14 @@ flowchart LR
         direction LR
         pr["Pull request"] --> checks["lint + testes + build<br/>cdk synth + cdk diff"]
         checks --> merge["merge na main"]
-        merge --> dev["cdk deploy dev<br/>automático"]
-        dev --> smoke["smoke test dev"]
-        smoke --> tag["tag vX.Y.Z"]
-        tag --> aprov{"aprovação manual<br/>environment prod"}
-        aprov --> prod["cdk deploy prod<br/>canary nas Lambdas"]
-        prod --> alarme{"alarme de erros?"}
+        merge --> dev["cdk deploy dev<br/>canary nas Lambdas"]
+        dev --> alarme{"alarme de erros?"}
         alarme -- "sim" --> rollback["rollback automático"]
         alarme -- "não" --> ok["100% do tráfego"]
+        ok --> smoke["smoke test dev"]
     end
 
-    subgraph ordem["Primeiro deploy de um ambiente"]
+    subgraph ordem["Primeiro deploy em dev"]
         direction LR
         o0["0. bootstrap manual<br/>cdk bootstrap + stack cicd"] --> o1["1. infra-base"]
         o1 --> o2["2. users, categories,<br/>expenses services"]
@@ -403,8 +400,8 @@ sequenceDiagram
     participant CD as CodeDeploy
 
     GH->>GH: Gera token OIDC do job
-    GH->>STS: AssumeRoleWithWebIdentity gh-deploy-repo-env
-    STS->>STS: Valida repo Rossete-Inc e environment
+    GH->>STS: AssumeRoleWithWebIdentity gh-deploy-repo-dev
+    STS->>STS: Valida repo Rossete-Inc e environment dev
     STS-->>GH: Credenciais temporárias de 1h
     GH->>SSM: Lê parâmetros exigidos
     alt parâmetro ausente
@@ -413,7 +410,7 @@ sequenceDiagram
     else parâmetros ok
         GH->>CFN: cdk deploy
         CFN->>CD: Publica nova versão da Lambda no alias live
-        CD->>CD: Canary em prod, all at once em dev
+        CD->>CD: Canary 10% por 5 minutos
         CD-->>CFN: Sucesso ou rollback
         CFN-->>GH: Status do deploy
         GH->>SSM: Publica ARNs e IDs atualizados

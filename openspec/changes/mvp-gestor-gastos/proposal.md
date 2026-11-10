@@ -13,7 +13,7 @@ Hoje não existe um lugar simples para registrar e acompanhar gastos de cartão 
 - Painel mensal com total, total por grupo, gráfico de pizza por categoria e últimos lançamentos.
 - App PWA instalável em Android e iOS.
 - Ambiente local completo (Docker) para executar e validar cada funcionalidade na máquina do desenvolvedor antes de implantá-la na AWS. A entrega é feita em fatias verticais (Autenticação e perfil → Categorias → Gastos → Painel → Admin), e cada fatia só sobe para `dev` depois de validada localmente.
-- Esteira de entrega contínua: todo deploy na AWS é automático, sem credenciais fixas, com aprovação e rollback em produção.
+- Esteira de entrega contínua: todo deploy na AWS é automático, sem credenciais fixas, com rollback automático das funções. A nuvem tem um único ambiente, `dev`.
 - Alerta de custo da conta AWS.
 
 ## Capabilities

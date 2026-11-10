@@ -8,9 +8,10 @@
   - Públicos porque a org está no plano Free (ver design.md, "Repositórios públicos e região"). A proteção da `main` exige PR (0 aprovações, já que o desenvolvedor é único), histórico linear e conversas resolvidas, vale também para admins e bloqueia force push e exclusão. Ela já está aplicada nos 6 repositórios iniciados com README.
   - O `infra-base` foi criado vazio para receber o push da 1.2. A proteção dele é aplicada ao fim da 1.2.
 - [x] 1.2 Ligar este diretório ao remoto `gestor-gastos-infra-base`, fazer commit e push dos docs e do OpenSpec, e aplicar a proteção da `main` do mesmo jeito da 1.1; verificar o README renderizado no GitHub
-- [x] 1.3 Criar os GitHub Environments `dev` e `prod` em cada repositório implantável, com aprovação obrigatória em `prod`, e o template de PR com o item "Validado localmente"; verificar nas configurações de cada repositório
+- [x] 1.3 Criar o GitHub Environment `dev` em cada repositório implantável, restrito à `main`, e o template de PR com o item "Validado localmente"; verificar nas configurações de cada repositório
   - Environments em `infra-base`, `users-service`, `categories-service`, `expenses-service`, `bff` e `frontend`. O `go-commons` fica de fora porque não é implantável.
-  - `dev` aceita deploy só da branch `main`. `prod` aceita deploy só de tags `v*.*.*` e exige aprovação de `rrossete`, com autoaprovação permitida porque o desenvolvedor é único.
+  - `dev` aceita deploy só da branch `main`, sem aprovação manual.
+  - Em 2026-11-10 a nuvem passou a ter um ambiente só, `dev` (ADR 0007). O Environment `prod`, criado antes dessa decisão, deixa de ser usado e pode ser apagado.
   - O `.github/pull_request_template.md` foi adicionado por PR nos 7 repositórios.
 
 ## 2. Design (Figma)
@@ -53,10 +54,10 @@
 ## 6. Base na nuvem + deploy da fatia 1 (após 5.8)
 
 - [ ] 6.1 Instalar o AWS CDK e rodar `cdk bootstrap` em us-east-1; verificar a stack `CDKToolkit` no CloudFormation
-- [ ] 6.2 infra-base: stack `cicd` com o OIDC provider do GitHub e roles `gh-deploy-<repo>-<env>` com trust `repo:Rossete-Inc/<repo>:environment:<env>`, e stack `budget` com US$ 5 e alertas a 80% do real e 100% do previsto; testes de assertion do CDK e deploy local único
-- [ ] 6.3 infra-base: workflows reutilizáveis `go-service.yml` (vet, golangci-lint, test, build arm64, synth/diff no PR, checagem de "Validado localmente", deploy dev na `main`, deploy prod na tag com environment, `concurrency` por ambiente) e `frontend.yml` (tsc, eslint, jest, boundaries, `expo export -p web`, `amplify create-deployment`); verificar com `actionlint` e rodando no próprio infra-base
+- [ ] 6.2 infra-base: stack `cicd` com o OIDC provider do GitHub e roles `gh-deploy-<repo>-dev` com trust `repo:Rossete-Inc/<repo>:environment:dev`, roles só leitura `gh-diff-<repo>` para o `cdk diff` com trust `repo:Rossete-Inc/<repo>:pull_request`, e stack `budget` com US$ 5 e alertas a 80% do real e 100% do previsto; testes de assertion do CDK e deploy local único
+- [ ] 6.3 infra-base: workflows reutilizáveis `go-service.yml` (vet, golangci-lint, test, build arm64, synth/diff no PR, checagem de "Validado localmente", deploy em `dev` na `main` com environment, `concurrency` por repositório) e `frontend.yml` (tsc, eslint, jest, boundaries, `expo export -p web`, `amplify create-deployment`); verificar com `actionlint` e rodando no próprio infra-base
 - [ ] 6.4 infra-base: stacks `auth` (User Pool com SRP, access token de 15 min, grupos), `events` (barramento com DLQ), `api` (HTTP API, authorizer JWT, CORS, throttling), trigger Post Confirmation em Go e parâmetros no SSM; testes de assertion, verificar que uma chamada sem token recebe 401 e `aws ssm get-parameters-by-path`
-- [ ] 6.5 users-service e BFF: CDK (tabela on-demand com RETAIN em prod, Lambda arm64 256 MB com alias `live`, CodeDeploy canary em prod, logs 7/30 dias, regra do EventBridge, ARNs no SSM, falha clara quando faltar parâmetro); deploy em `dev` pela esteira e smoke test de `GET /me` com token real
+- [ ] 6.5 users-service e BFF: CDK (tabela on-demand com RETAIN, Lambda arm64 256 MB com alias `live`, CodeDeploy canary, logs 7 dias, regra do EventBridge, ARNs no SSM, falha clara quando faltar parâmetro); deploy em `dev` pela esteira e smoke test de `GET /me` com token real
 - [ ] 6.6 frontend: Amplify Hosting com rewrite SPA e deploy em `dev`; criar o primeiro admin via CLI e documentar em `docs/`; o usuário repete o roteiro da 5.8 em `dev`
 
 ## 7. Fatia 2 — Categorias
@@ -99,11 +100,11 @@
 - [ ] 11.2 **Validação local pelo usuário:** instalar pelo celular na rede local, abrir offline e ver o aviso. O usuário aprova
 - [ ] 11.3 Deploy em `dev` e instalação real em Android e iOS
 
-## 12. Integração ponta a ponta e produção
+## 12. Integração ponta a ponta
 
 - [ ] 12.1 E2E Playwright rodando no ambiente local e em `dev`: cadastro → confirmação → login → lançar gasto → ver no painel e na pizza → editar → excluir; o teste passa na esteira do frontend
 - [ ] 12.2 E2E admin em `dev`: admin bloqueia usuário → login recusado → reativa → login aceito; admin exclui usuário → dados removidos; o teste passa
-- [ ] 12.3 Promover todos os repositórios para `prod` via tag `v1.0.0` com aprovação; verificar o smoke test em prod e o canary concluído
+- [ ] 12.3 Implantar a versão final de todos os repositórios em `dev` pela `main`; verificar o smoke test e o canary concluído em cada um
 - [ ] 12.4 Após 7 dias, conferir no Cost Explorer que o custo está dentro do orçamento; registrar o resultado em `docs/`
 
 ## Workflow follow-up

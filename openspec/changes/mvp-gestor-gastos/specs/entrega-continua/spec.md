@@ -46,30 +46,34 @@ Todo merge na branch `main` de um repositório implantável SHALL implantar auto
 - **WHEN** um pull request aprovado é integrado na `main` do `gestor-gastos-expenses-service`
 - **THEN** a nova versão é implantada em `dev` sem ação manual e o smoke test é executado
 
-### Requirement: Deploy em produção com aprovação
-O deploy em `prod` SHALL ocorrer somente a partir de uma tag de versão `vX.Y.Z` e MUST exigir aprovação manual.
+### Requirement: Ambiente único na nuvem
+A AWS SHALL ter um único ambiente, `dev`, implantado somente a partir da `main`. Tags de versão MUST NOT disparar deploy.
 
 #### Scenario: Tag criada
-- **WHEN** a tag `v1.0.0` é criada
-- **THEN** a esteira aguarda aprovação e, uma vez aprovada, implanta a mesma versão em `prod`
+- **WHEN** a tag `v1.0.0` é criada em um repositório implantável
+- **THEN** a esteira não executa nenhum deploy
 
-#### Scenario: Deploy em prod sem tag
-- **WHEN** alguém tenta implantar em `prod` a partir de uma branch sem tag
+#### Scenario: Deploy a partir de outra branch
+- **WHEN** alguém tenta implantar em `dev` a partir de uma branch diferente da `main`
 - **THEN** a esteira não executa o deploy
 
-### Requirement: Rollback automático em produção
-Em `prod`, novas versões de funções MUST receber tráfego gradualmente e MUST voltar automaticamente à versão anterior se a taxa de erros ultrapassar o limite definido.
+### Requirement: Rollback automático das funções
+Em `dev`, novas versões de funções MUST receber tráfego gradualmente e MUST voltar automaticamente à versão anterior se a taxa de erros ultrapassar o limite definido.
 
 #### Scenario: Versão com erros
-- **WHEN** uma nova versão em `prod` gera erros acima do limite durante a liberação gradual
+- **WHEN** uma nova versão em `dev` gera erros acima do limite durante a liberação gradual
 - **THEN** o tráfego volta integralmente à versão anterior sem intervenção manual
 
 ### Requirement: Sem credenciais de longa duração
-A esteira MUST se autenticar na AWS com credenciais temporárias, restritas ao repositório e ao ambiente. Chaves de acesso fixas MUST NOT ser usadas.
+A esteira MUST se autenticar na AWS com credenciais temporárias, restritas ao repositório e à finalidade: deploy em `dev` só no Environment `dev`, e prévia só de leitura no pull request. Chaves de acesso fixas MUST NOT ser usadas.
 
 #### Scenario: Repositório não autorizado
-- **WHEN** um workflow de um repositório fora da organização Rossete-Inc, ou de um ambiente diferente, tenta assumir a permissão de deploy
+- **WHEN** um workflow de um repositório fora da organização Rossete-Inc, ou de um job fora do Environment `dev`, tenta assumir a permissão de deploy
 - **THEN** a AWS recusa a autenticação
+
+#### Scenario: Prévia no pull request
+- **WHEN** o job de prévia de infraestrutura de um pull request se autentica na AWS
+- **THEN** ele recebe uma permissão só de leitura, que não consegue criar nem alterar recursos
 
 ### Requirement: Deploys não concorrentes
 Dois deploys do mesmo repositório no mesmo ambiente MUST NOT executar ao mesmo tempo.

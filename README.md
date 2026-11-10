@@ -34,7 +34,7 @@ O sistema **não usa monorepo**: são repositórios separados (ver [ADR 0006](do
 Todo deploy na AWS é automático via GitHub Actions + AWS CDK, autenticado por OIDC, sem access keys ([ADR 0007](docs/adr/0007-esteira-ci-cd.md)):
 
 - **Pull request:** validações e `cdk diff`.
-- **Merge na `main`:** deploy automático em **dev**.
-- **Tag `vX.Y.Z`:** deploy em **prod**, com aprovação manual e canary nas Lambdas.
+- **Merge na `main`:** deploy automático em **dev**, com canary nas Lambdas.
+- **Ambiente único:** a AWS tem só o ambiente `dev`, para manter o custo de um projeto de estudo. Tags não fazem deploy.
 
 Este repositório guarda os workflows reutilizáveis e a stack `cicd`, que cria o OIDC provider e as roles de deploy.
