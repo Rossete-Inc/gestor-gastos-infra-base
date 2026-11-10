@@ -41,13 +41,14 @@
 ## 5. Fatia 1 — Autenticação e perfil (local)
 
 - [x] 5.1 users-service: domínio de perfil, papéis e máquina de estados do ciclo de vida, store DynamoDB com GSI de listagem, consumidor idempotente de `UserConfirmed` e operação `ObterPerfil`/`CriarPerfil`; testes unitários e de integração com DynamoDB Local
-- [ ] 5.2 users-service: `cmd/local` (servidor HTTP chamando o mesmo handler da Lambda); verificar com `curl` no ambiente local
-- [ ] 5.3 BFF: escrever o `openapi.yaml` completo (`/me`, `/telas/dashboard`, `/telas/gastos`, `/telas/gasto-form`, `/gastos`, `/categorias`, `/admin/telas/usuarios`, `/admin/usuarios/{id}`) com erros problem+json; verificar com lint do OpenAPI (Spectral) no CI
-- [ ] 5.4 BFF: validação do JWT (JWKS do cognito-local ou do Cognito), extração do `userId` e dos grupos, checagem de `admin` em `/admin/*`, `/me` com criação do perfil sob demanda e `cmd/local`; testes cobrindo 401, 403 e perfil ausente
-- [ ] 5.5 frontend: criar o projeto Expo + Expo Router (TS strict) com a estrutura `app/features/shared`, ESLint de fronteiras, Prettier, Husky, env validado com Zod e `.env.local` apontando para o BFF e o cognito-local; verificar com `tsc`, `eslint` e `check_boundaries.py` sem erros
-- [ ] 5.6 frontend: `shared/ui` com os tokens e componentes do Figma e `shared/api` com tipos gerados pelo `orval`, cliente HTTP com token, TanStack Query e MSW; testes de componentes e teste de que um 401 dispara a renovação de sessão
-- [ ] 5.7 frontend: feature `auth` (cadastro, confirmação, login, logout, renovação) e tela Perfil; testes cobrindo os cenários da spec `autenticacao`
-- [ ] 5.8 **Validação local pelo usuário:** com `task local:up`, users-service, BFF e `expo start --web`, seguir o roteiro cadastro → confirmação (código no log do cognito-local) → login → Perfil → logout, incluindo senha fraca e login inválido. O usuário aprova antes do grupo 6
+- [x] 5.2 users-service: `cmd/local` (servidor HTTP chamando o mesmo handler da Lambda); verificar com `curl` no ambiente local
+- [x] 5.3 BFF: escrever o `openapi.yaml` completo (`/me`, `/telas/dashboard`, `/telas/gastos`, `/telas/gasto-form`, `/gastos`, `/categorias`, `/admin/telas/usuarios`, `/admin/usuarios/{id}`) com erros problem+json; verificar com lint do OpenAPI (Spectral) no CI
+- [x] 5.4 BFF: validação do JWT (JWKS do cognito-local ou do Cognito), extração do `userId` e dos grupos, checagem de `admin` em `/admin/*`, `/me` com criação do perfil sob demanda e `cmd/local`; testes cobrindo 401, 403 e perfil ausente
+- [x] 5.5 frontend: criar o projeto Expo + Expo Router (TS strict) com a estrutura `app/features/shared`, ESLint de fronteiras, Prettier, Husky, env validado com Zod e `.env.local` apontando para o BFF e o cognito-local; verificar com `tsc`, `eslint` e `check_boundaries.py` sem erros
+- [x] 5.6 frontend: `shared/ui` com os tokens e componentes do Figma e `shared/api` com tipos gerados pelo `orval`, cliente HTTP com token, TanStack Query e MSW; testes de componentes e teste de que um 401 dispara a renovação de sessão
+- [x] 5.7 frontend: feature `auth` (cadastro, confirmação, login, logout, renovação) e tela Perfil; testes cobrindo os cenários da spec `autenticacao`
+- [x] 5.8 **Validação local pelo usuário:** com `task local:up`, users-service, BFF e `expo start --web`, seguir o roteiro cadastro → confirmação (código no log do cognito-local) → login → Perfil → logout, incluindo senha fraca e login inválido. O usuário aprova antes do grupo 6
+  - Aprovada pelo usuário em 2026-11-10.
 
 ## 6. Base na nuvem + deploy da fatia 1 (após 5.8)
 
