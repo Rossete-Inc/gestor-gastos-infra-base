@@ -112,7 +112,10 @@ jobs:
       env-ssm: |
         EXPO_PUBLIC_API_URL=/gestor-gastos/{env}/api/url
         EXPO_PUBLIC_COGNITO_CLIENT_ID=/gestor-gastos/{env}/auth/user-pool-client-id
+        EXPO_PUBLIC_COGNITO_USER_POOL_ID=/gestor-gastos/{env}/auth/user-pool-id
 ```
+
+O app do Amplify (plataforma `WEB`, sem repositório conectado, branch `main`, rewrite de SPA e headers de cache) é criado pela stack `gestor-gastos-dev-web` do infra-base, que também publica a URL do site para o CORS da API.
 
 ### Inputs do `frontend.yml`
 
@@ -137,7 +140,7 @@ Os scripts esperados no `package.json` são `typecheck`, `lint`, `check:boundari
 Em ordem:
 
 1. A variável `AMPLIFY_APP_ID` do **Environment** `dev` do GitHub, se existir. Serve para o primeiro deploy ou para apontar para outro app sem mexer no SSM.
-2. O parâmetro `/gestor-gastos/dev/frontend/amplify-app-id` no SSM, publicado pelo CDK do frontend (tarefa 6.6). É o caminho normal.
+2. O parâmetro `/gestor-gastos/dev/frontend/amplify-app-id` no SSM, publicado pela stack `gestor-gastos-dev-web` deste repositório (tarefa 6.6, [`infra/README.md`](../infra/README.md#stack-web)). É o caminho normal.
 
 Se nenhum dos dois existir, o deploy falha com mensagem clara. O deploy segue o fluxo manual do Amplify (app sem repositório conectado): `create-deployment`, upload do zip para a URL pré-assinada, `start-deployment` e espera o job terminar (até 10 minutos). A URL publicada é `https://<branch>.<app-id>.amplifyapp.com`.
 

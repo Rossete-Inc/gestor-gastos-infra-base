@@ -9,10 +9,11 @@ App CDK do `gestor-gastos-infra-base`. Região fixa: `us-east-1`. Por custo, há
 | `gestor-gastos-cicd` | conta | OIDC provider do GitHub (`token.actions.githubusercontent.com`, audience `sts.amazonaws.com`) 6 roles de deploy `gh-deploy-<repo>-dev` e 5 roles só leitura `gh-diff-<repo>` |
 | `gestor-gastos-budget` | conta | Budget mensal `gestor-gastos-mensal` de US$ 5, com alerta por e-mail a 80% do custo real e a 100% do previsto |
 | `gestor-gastos-dev-events` | ambiente | Barramento do EventBridge `gestor-gastos-dev`, DLQ SQS `gestor-gastos-dev-events-dlq` para os targets das regras dos serviços e alarme quando a DLQ tem mensagens |
-| `gestor-gastos-dev-auth` | ambiente | User Pool `gestor-gastos-dev-users` (plano Lite), grupos `admin` e `cliente`, app client público `gestor-gastos-dev-frontend` (SRP) e a Lambda do trigger Post Confirmation |
+| `gestor-gastos-dev-auth` | ambiente | User Pool `gestor-gastos-dev-users` (plano Lite), grupos `admin` e `cliente`, app client público `gestor-gastos-dev-frontend` (SRP) e a Lambda do trigger Post Confirmation. Primeiro admin: [`docs/primeiro-admin.md`](../docs/primeiro-admin.md) |
+| `gestor-gastos-dev-web` | ambiente | App do Amplify Hosting `gestor-gastos-dev-web` (plataforma `WEB`, sem repositório conectado) com a branch `main`, o rewrite de SPA e os headers de cache da PWA |
 | `gestor-gastos-dev-api` | ambiente | HTTP API `gestor-gastos-dev-api` com authorizer JWT do Cognito, CORS, throttling no stage `$default` e a rota de verificação `GET /infra/auth-check` |
 
-As stacks de ambiente usam o contexto `env` (padrão `dev`, o mesmo `--context env=dev` que o `go-service.yml` passa). Elas só se comunicam pelo SSM: a `api` lê o issuer e o client id que a `auth` publicou, resolvidos pelo CloudFormation no deploy. A ordem de deploy é declarada com `addStackDependency`, que não cria exports: **events → auth → api**.
+As stacks de ambiente usam o contexto `env` (padrão `dev`, o mesmo `--context env=dev` que o `go-service.yml` passa). Elas só se comunicam pelo SSM: a `api` lê o issuer e o client id que a `auth` publicou e a URL do site que a `web` publicou, resolvidos pelo CloudFormation no deploy. A ordem de deploy é declarada com `addStackDependency`, que não cria exports: **events → auth → api** e **web → api**.
 
 ### Parâmetros no SSM
 
@@ -32,6 +33,9 @@ Todos do tipo `String`, tier Standard (sem custo), em `/gestor-gastos/dev/`. Os 
 | `/gestor-gastos/dev/api/id` | api | Id da HTTP API | BFF (adiciona as rotas) |
 | `/gestor-gastos/dev/api/url` | api | `https://<api-id>.execute-api.us-east-1.amazonaws.com` | frontend (`EXPO_PUBLIC_API_URL`), smoke tests |
 | `/gestor-gastos/dev/api/authorizer-id` | api | Id do authorizer JWT | BFF (protege as rotas) |
+| `/gestor-gastos/dev/frontend/amplify-app-id` | web | Id do app do Amplify | `frontend.yml` (input `amplify-app-id-ssm`), deploy do front |
+| `/gestor-gastos/dev/frontend/amplify-branch` | web | `main` | referência (o `frontend.yml` usa o input `amplify-branch`, padrão `main`) |
+| `/gestor-gastos/dev/frontend/url` | web | `https://main.<app-id>.amplifyapp.com` | stack api (CORS), smoke tests e E2E |
 
 Os nomes ficam em `infra/config.go` (`Param*`).
 
@@ -53,10 +57,18 @@ Os nomes ficam em `infra/config.go` (`Param*`).
 
 - HTTP API `gestor-gastos-dev-api`. As rotas de negócio são do BFF (tarefa 6.5), que as adiciona a esta API lendo `api/id` e `api/authorizer-id` do SSM.
 - **Authorizer JWT** `cognito-jwt`: issuer = `auth/issuer-url`, audience = `auth/user-pool-client-id`, token no header `Authorization`. Para access tokens do Cognito, que não têm `aud`, a HTTP API compara a audience com a claim `client_id`.
-- **CORS:** sempre libera `http://localhost:8081` (`expo start --web`). A origem do site no Amplify é configurável pelo contexto `amplifyOrigin` ou pela variável `AMPLIFY_ORIGIN` (ex.: `https://main.d1abc.amplifyapp.com`, sem barra final). O app do Amplify só existe a partir da tarefa 6.6; quando existir, grave a origem em `infra/cdk.json` (`"context": { "amplifyOrigin": "..." }`), para todo deploy usá-la. Métodos `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`; headers `Authorization` e `Content-Type`; cache do preflight de 1 hora.
+- **CORS:** libera `http://localhost:8081` (`expo start --web`) e a URL do site no Amplify, lida de `/gestor-gastos/dev/frontend/url` (stack web) no deploy. Por isso a stack web vai antes da api. O contexto `amplifyOrigin` ou a variável `AMPLIFY_ORIGIN` sobrescrevem essa origem (ex.: um domínio próprio no futuro, `https://app.exemplo.com`, sem barra final); com eles, a api não lê o SSM. Métodos `GET`, `POST`, `PUT`, `PATCH`, `DELETE` e `OPTIONS`; headers `Authorization` e `Content-Type`; cache do preflight de 1 hora.
 - **Throttling** no stage `$default`, para todas as rotas: burst 20 e 10 requisições/s. Baixo de propósito, para limitar o custo em caso de abuso.
 - **Rota de verificação `GET /infra/auth-check`:** protegida pelo authorizer JWT. Uma HTTP API sem rotas responde 404, não 401, e HTTP API não tem integração mock. Por isso a rota repassa (HTTP proxy) para o JWKS público do próprio pool: sem Lambda e sem custo parada. Sem token, o authorizer responde **401** antes de chegar à integração. Com um access token válido, ela devolve as chaves públicas do pool (que já são públicas), o que também serve de smoke test do login.
 - Sem logs de acesso, por custo.
+
+### Stack web
+
+- **App do Amplify Hosting** `gestor-gastos-dev-web`, plataforma `WEB` (site estático), **sem repositório conectado**, sem token do GitHub e sem role de serviço. O build roda no GitHub Actions (`frontend.yml`) e chega por deploy manual (`create-deployment`, upload do zip e `start-deployment`). Assim o Amplify não cobra minutos de build: o custo é só a hospedagem, dentro do free tier.
+- **Branch `main`** (do Amplify, sem relação com Git): stage `DEVELOPMENT`, sem build automático e sem preview de PR. É a branch que o `frontend.yml` usa por padrão (input `amplify-branch`). URL: `https://main.<app-id>.amplifyapp.com`.
+- **Rewrite de SPA:** `</^[^.]+$|\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|webp|woff|woff2|ttf|otf|map|json|webmanifest)$)([^.]+$)/>` → `/index.html`, status `200`. Rotas como `/perfil` abrem o app; arquivos com essas extensões (bundles, ícones, fontes, `manifest.json`, `sw.js`) são servidos como estão, e um arquivo ausente dá 404 em vez de devolver HTML. É o que mantém o service worker e o manifest da PWA (tarefa 11.1) funcionando.
+- **Headers de cache** no próprio app (em deploy manual o Amplify não lê o `customHttp.yml` do artefato): `sw.js`, `manifest.json` e `index.html` com `no-cache`; `/_expo/static/**/*` (bundles com hash no nome) com `public, max-age=31536000, immutable`.
+- Sem domínio próprio. Apagar a stack apaga o app e o site (não há dados nele; o próximo deploy do front recria o conteúdo).
 
 ## Comandos
 
@@ -98,7 +110,7 @@ O GitHub só emite esse `sub` quando o job declara `environment: dev`. Um job se
 - `sts:AssumeRole` e `sts:TagSession` em `arn:aws:iam::<conta>:role/cdk-*`, as roles criadas pelo `cdk bootstrap` (deploy, file-publishing, image-publishing e lookup). Quem cria os recursos é a `cloudformation-execution-role` do bootstrap, assumida pelo CloudFormation.
 - `ssm:GetParameter`, `ssm:GetParameters` e `ssm:GetParametersByPath` em `/gestor-gastos/<env>` e `/gestor-gastos/<env>/*`, para a esteira checar pré-requisitos antes do deploy e falhar com mensagem clara.
 
-A role do **frontend** recebe também permissões no Amplify Hosting, porque o site não é publicado pelo CDK: a esteira envia o build do `expo export -p web` com `aws amplify create-deployment` e `start-deployment` e acompanha o job. As ações são `amplify:CreateDeployment`, `StartDeployment`, `GetApp`, `GetBranch`, `GetJob`, `ListJobs` e `StopJob`, em `arn:aws:amplify:us-east-1:<conta>:apps/*`. O escopo é `apps/*` porque o app só será criado na tarefa 6.6. Depois disso dá para restringir ao app id.
+A role do **frontend** recebe também permissões no Amplify Hosting, porque o site não é publicado pelo CDK: a esteira envia o build do `expo export -p web` com `aws amplify create-deployment` e `start-deployment` e acompanha o job. As ações são `amplify:CreateDeployment`, `StartDeployment`, `GetApp`, `GetBranch`, `GetJob`, `ListJobs` e `StopJob`, em `arn:aws:amplify:us-east-1:<conta>:apps/*`. O escopo é `apps/*` porque o app é criado pela stack web, depois da `cicd`, e o id só é conhecido após o deploy. Dá para restringir ao app id mais tarde.
 
 **Limite conhecido.** As roles de deploy assumem as roles `cdk-*` do bootstrap, que têm poder de administrador via CloudFormation. O que protege a conta é a trust por environment somada à regra do Environment `dev` (só a `main`, que é protegida e exige PR).
 
@@ -166,7 +178,7 @@ BUDGET_EMAIL=voce@exemplo.com npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-bu
 
 Na esteira, o e-mail vem da variável `BUDGET_EMAIL` do GitHub Environment `dev`.
 
-## Deploy das stacks do ambiente (events, auth, api)
+## Deploy das stacks do ambiente (events, auth, web, api)
 
 Pré-requisitos: bootstrap do CDK feito e stack `cicd` implantada. Enquanto o deploy do infra-base não estiver na esteira (ver o topo de `.github/workflows/ci.yml`), ele é feito à mão por um admin. Confira sempre o diff antes:
 
@@ -174,11 +186,32 @@ Pré-requisitos: bootstrap do CDK feito e stack `cicd` implantada. Enquanto o de
 task infra:test
 task infra:build
 cd infra
-npx --yes aws-cdk@2.1148.0 diff gestor-gastos-dev-events gestor-gastos-dev-auth gestor-gastos-dev-api -c env=dev
-npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-dev-events gestor-gastos-dev-auth gestor-gastos-dev-api -c env=dev
+npx --yes aws-cdk@2.1148.0 diff gestor-gastos-dev-events gestor-gastos-dev-auth gestor-gastos-dev-web gestor-gastos-dev-api -c env=dev
+npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-dev-events gestor-gastos-dev-auth gestor-gastos-dev-web gestor-gastos-dev-api -c env=dev
 ```
 
-O CDK implanta na ordem events → auth → api e pede confirmação das mudanças de IAM (role do trigger e permissão para o Cognito invocá-lo). As três stacks são nomeadas porque `--all` incluiria as stacks da conta.
+O CDK implanta na ordem events → auth → web → api e pede confirmação das mudanças de IAM (role do trigger e permissão para o Cognito invocá-lo). As stacks são nomeadas porque `--all` incluiria as stacks da conta.
+
+**Só a web e o CORS (tarefa 6.6, com events e auth já implantadas):**
+
+```sh
+npx --yes aws-cdk@2.1148.0 diff gestor-gastos-dev-web gestor-gastos-dev-api -c env=dev
+npx --yes aws-cdk@2.1148.0 deploy gestor-gastos-dev-web gestor-gastos-dev-api -c env=dev --exclusively
+```
+
+O diff da api deve mostrar só o `CorsConfiguration.AllowOrigins` ganhando a URL do site e o novo parâmetro do CloudFormation `/gestor-gastos/dev/frontend/url`. O `--exclusively` evita reimplantar events e auth. Depois, confira:
+
+```sh
+aws ssm get-parameters-by-path --path /gestor-gastos/dev/frontend --region us-east-1 \
+  --query "Parameters[].[Name,Value]" --output table
+SITE=$(aws ssm get-parameter --name /gestor-gastos/dev/frontend/url --region us-east-1 --query Parameter.Value --output text)
+API_URL=$(aws ssm get-parameter --name /gestor-gastos/dev/api/url --region us-east-1 --query Parameter.Value --output text)
+# Preflight a partir do site: deve devolver access-control-allow-origin igual a $SITE
+curl -i -X OPTIONS "$API_URL/me" -H "Origin: $SITE" -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: authorization"
+```
+
+Até o primeiro deploy do frontend, `$SITE` responde 404: a branch existe, mas ainda não recebeu nenhum build.
 
 Verificação:
 

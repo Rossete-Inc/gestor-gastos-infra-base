@@ -13,7 +13,7 @@ import (
 	"github.com/aws/jsii-runtime-go"
 )
 
-// Testes das stacks do ambiente (events, auth, api), da tarefa 6.4.
+// Testes das stacks do ambiente (events, auth e api da tarefa 6.4, web da 6.6).
 // Rodam sem AWS e sem compilar a Lambda: o bootstrap é um arquivo falso.
 
 const envTeste = "dev"
@@ -81,7 +81,7 @@ func exigirParametros(t *testing.T, tpl assertions.Template, params ...string) {
 
 func TestNomesDasStacksDoAmbiente(t *testing.T) {
 	app := appTeste(t, map[string]interface{}{})
-	for _, nome := range []string{"gestor-gastos-dev-events", "gestor-gastos-dev-auth", "gestor-gastos-dev-api"} {
+	for _, nome := range []string{"gestor-gastos-dev-events", "gestor-gastos-dev-auth", "gestor-gastos-dev-web", "gestor-gastos-dev-api"} {
 		if got := *stackDoApp(t, app, nome).StackName(); got != nome {
 			t.Errorf("stackName = %s, quer %s", got, nome)
 		}
@@ -104,6 +104,12 @@ func TestOrdemDeDeploy(t *testing.T) {
 	if !depende("gestor-gastos-dev-api", "gestor-gastos-dev-auth") {
 		t.Error("api deve ser implantada depois de auth")
 	}
+	if !depende("gestor-gastos-dev-api", "gestor-gastos-dev-web") {
+		t.Error("api deve ser implantada depois de web (o CORS lê a URL do site)")
+	}
+	if n := len(*stackDoApp(t, app, "gestor-gastos-dev-web").Dependencies()); n != 0 {
+		t.Errorf("web não deve depender de outra stack, tem %d dependências", n)
+	}
 }
 
 func TestAmbienteInvalidoFalha(t *testing.T) {
@@ -117,7 +123,7 @@ func TestAmbienteInvalidoFalha(t *testing.T) {
 
 func TestStacksDoAmbienteSemExports(t *testing.T) {
 	app := appTeste(t, map[string]interface{}{})
-	for _, nome := range []string{"gestor-gastos-dev-events", "gestor-gastos-dev-auth", "gestor-gastos-dev-api"} {
+	for _, nome := range []string{"gestor-gastos-dev-events", "gestor-gastos-dev-auth", "gestor-gastos-dev-web", "gestor-gastos-dev-api"} {
 		b, err := json.Marshal(assertions.Template_FromStack(stackDoApp(t, app, nome), nil).ToJSON())
 		if err != nil {
 			t.Fatal(err)
@@ -464,14 +470,31 @@ func TestApiRotaDeVerificacaoProtegida(t *testing.T) {
 	tpl.ResourceCountIs(jsii.String("AWS::Lambda::Function"), jsii.Number(0))
 }
 
-func TestApiCorsSoLocalhostPorPadrao(t *testing.T) {
+// idParametroSsm devolve o id lógico do parâmetro do CloudFormation que lê o
+// caminho informado do SSM no deploy ("" se não houver).
+func idParametroSsm(tpl assertions.Template, caminho string) string {
+	for id, p := range *tpl.FindParameters(jsii.String("*"), nil) {
+		if (*p)["Default"] == caminho {
+			return id
+		}
+	}
+	return ""
+}
+
+func TestApiCorsLiberaLocalhostEOSiteDoSsmPorPadrao(t *testing.T) {
 	tpl := templateDe(t, "gestor-gastos-dev-api")
+
+	// A URL do site vem do SSM (publicada pela stack web), resolvida no deploy.
+	site := idParametroSsm(tpl, "/gestor-gastos/dev/frontend/url")
+	if site == "" {
+		t.Fatal("a api deveria ler /gestor-gastos/dev/frontend/url do SSM")
+	}
 
 	tpl.HasResourceProperties(jsii.String("AWS::ApiGatewayV2::Api"), map[string]interface{}{
 		"Name":         "gestor-gastos-dev-api",
 		"ProtocolType": "HTTP",
 		"CorsConfiguration": map[string]interface{}{
-			"AllowOrigins": []interface{}{"http://localhost:8081"},
+			"AllowOrigins": []interface{}{"http://localhost:8081", map[string]interface{}{"Ref": site}},
 			"AllowHeaders": []interface{}{"Authorization", "Content-Type"},
 			"AllowMethods": []interface{}{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 			"MaxAge":       3600,
@@ -479,7 +502,7 @@ func TestApiCorsSoLocalhostPorPadrao(t *testing.T) {
 	})
 }
 
-func TestApiCorsComOrigemDoAmplify(t *testing.T) {
+func TestApiCorsComOrigemSobrescritaPeloContexto(t *testing.T) {
 	origem := "https://main.d1abc.amplifyapp.com"
 	app := appTeste(t, map[string]interface{}{ChaveContextoOrigemAmplify: origem})
 	tpl := assertions.Template_FromStack(stackDoApp(t, app, "gestor-gastos-dev-api"), nil)
@@ -489,6 +512,9 @@ func TestApiCorsComOrigemDoAmplify(t *testing.T) {
 			"AllowOrigins": []interface{}{"http://localhost:8081", origem},
 		}),
 	})
+	if idParametroSsm(tpl, "/gestor-gastos/dev/frontend/url") != "" {
+		t.Error("com amplifyOrigin no contexto, a api não deveria ler a URL do site no SSM")
+	}
 }
 
 func TestApiOrigemDoAmplifyPelaVariavelDeAmbiente(t *testing.T) {

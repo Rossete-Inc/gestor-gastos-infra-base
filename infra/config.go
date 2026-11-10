@@ -146,6 +146,12 @@ const (
 	ParamAPIID            = "api/id"
 	ParamAPIURL           = "api/url"
 	ParamAuthorizerID     = "api/authorizer-id"
+
+	// Publicados pela stack web. O frontend.yml lê o id do app em
+	// ParamAmplifyAppID (input amplify-app-id-ssm) e a stack api lê a URL.
+	ParamAmplifyAppID  = "frontend/amplify-app-id"
+	ParamAmplifyBranch = "frontend/amplify-branch"
+	ParamFrontendURL   = "frontend/url"
 )
 
 // CaminhoSSM devolve o caminho completo de um parâmetro do ambiente.

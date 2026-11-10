@@ -76,8 +76,9 @@ func novaRoleDeploy(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo, e
 	// O frontend não usa CDK para publicar o site: ele envia o build do
 	// `expo export -p web` direto ao Amplify Hosting (`aws amplify create-deployment`
 	// seguido de `start-deployment`). Por isso precisa de permissões próprias no
-	// Amplify. O app id ainda não existe (é criado na 6.6), então o escopo é
-	// "apps/*" da conta e região, não um app específico.
+	// Amplify. O app é criado pela stack web, depois desta (o id só existe após
+	// o deploy dela), então o escopo é "apps/*" da conta e região, não um app
+	// específico.
 	if repo == RepoFrontend {
 		role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
 			Sid: jsii.String("DeployNoAmplifyHosting"),
