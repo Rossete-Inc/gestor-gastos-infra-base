@@ -24,7 +24,8 @@ const (
 )
 
 // Ambientes implantáveis. Cada um corresponde a um GitHub Environment de mesmo nome.
-var Ambientes = []string{"dev", "prod"}
+// Por custo, o projeto tem um único ambiente na AWS (decisão de 2026-11-10, ADR 0007).
+var Ambientes = []string{"dev"}
 
 // ReposImplantaveis são os repositórios que fazem deploy na AWS e, por isso,
 // recebem uma role por ambiente. A go-commons não entra: ela só publica tags.
@@ -35,6 +36,28 @@ var ReposImplantaveis = []string{
 	"gestor-gastos-expenses-service",
 	"gestor-gastos-bff",
 	RepoFrontend,
+}
+
+// ReposComCdk são os repositórios que rodam `cdk diff` nos PRs e, por isso,
+// recebem uma role só leitura. O frontend publica no Amplify sem CDK.
+var ReposComCdk = []string{
+	"gestor-gastos-infra-base",
+	"gestor-gastos-users-service",
+	"gestor-gastos-categories-service",
+	"gestor-gastos-expenses-service",
+	"gestor-gastos-bff",
+}
+
+// NomeRoleDiff devolve o nome da role só leitura usada pelo `cdk diff` em PRs.
+// Ex.: gh-diff-gestor-gastos-bff.
+func NomeRoleDiff(repo string) string {
+	return "gh-diff-" + repo
+}
+
+// SubjectOIDCPullRequest é a claim `sub` que o GitHub emite para jobs de
+// pull_request sem `environment:`.
+func SubjectOIDCPullRequest(repo string) string {
+	return "repo:" + Org + "/" + repo + ":pull_request"
 }
 
 // NomeRoleDeploy devolve o nome da role de deploy de um repositório em um ambiente.

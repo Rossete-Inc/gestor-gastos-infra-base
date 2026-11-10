@@ -30,8 +30,8 @@ func TestCicdCriaOProviderOidcDoGitHub(t *testing.T) {
 func TestCicdCriaUmaRolePorRepositorioEAmbiente(t *testing.T) {
 	tpl := novaStackCicdTeste(t)
 
-	// 6 repositórios implantáveis x 2 ambientes.
-	tpl.ResourceCountIs(jsii.String("AWS::IAM::Role"), jsii.Number(12))
+	// 6 repositórios implantáveis x 1 ambiente + 5 roles de diff.
+	tpl.ResourceCountIs(jsii.String("AWS::IAM::Role"), jsii.Number(11))
 
 	for _, repo := range ReposImplantaveis {
 		for _, env := range Ambientes {
@@ -76,13 +76,76 @@ func TestCicdTrustDaRoleDeDev(t *testing.T) {
 	})
 }
 
-func TestCicdTrustDaRoleDeProd(t *testing.T) {
+func TestCicdNaoTemAmbienteProd(t *testing.T) {
 	tpl := novaStackCicdTeste(t)
 
-	tpl.HasResourceProperties(jsii.String("AWS::IAM::Role"), map[string]interface{}{
-		"RoleName":                 "gh-deploy-gestor-gastos-bff-prod",
-		"AssumeRolePolicyDocument": assertions.Match_ObjectEquals(trustEsperada("repo:Rossete-Inc/gestor-gastos-bff:environment:prod")),
+	roles := tpl.FindResources(jsii.String("AWS::IAM::Role"), map[string]interface{}{
+		"Properties": map[string]interface{}{"RoleName": "gh-deploy-gestor-gastos-bff-prod"},
 	})
+	if len(*roles) != 0 {
+		t.Fatal("não deveria existir role de prod: o projeto tem um único ambiente")
+	}
+}
+
+func TestCicdRoleDeDiffPorRepositorioComCdk(t *testing.T) {
+	tpl := novaStackCicdTeste(t)
+
+	for _, repo := range ReposComCdk {
+		tpl.HasResourceProperties(jsii.String("AWS::IAM::Role"), map[string]interface{}{
+			"RoleName":                 NomeRoleDiff(repo),
+			"AssumeRolePolicyDocument": assertions.Match_ObjectEquals(trustEsperada("repo:Rossete-Inc/" + repo + ":pull_request")),
+		})
+	}
+
+	frontend := tpl.FindResources(jsii.String("AWS::IAM::Role"), map[string]interface{}{
+		"Properties": map[string]interface{}{"RoleName": NomeRoleDiff(RepoFrontend)},
+	})
+	if len(*frontend) != 0 {
+		t.Fatal("o frontend não usa CDK e não deveria ter role de diff")
+	}
+}
+
+func TestCicdRoleDeDiffSoAssumeALookupRole(t *testing.T) {
+	tpl := novaStackCicdTeste(t)
+
+	tpl.HasResourceProperties(jsii.String("AWS::IAM::Policy"), map[string]interface{}{
+		"PolicyDocument": map[string]interface{}{
+			"Statement": assertions.Match_ArrayWith(&[]interface{}{
+				map[string]interface{}{
+					"Sid":    "AssumirLookupRoleDoBootstrap",
+					"Action": []interface{}{"sts:AssumeRole", "sts:TagSession"},
+					"Effect": "Allow",
+					"Resource": map[string]interface{}{
+						"Fn::Join": []interface{}{"", []interface{}{
+							"arn:", map[string]interface{}{"Ref": "AWS::Partition"},
+							":iam::", map[string]interface{}{"Ref": "AWS::AccountId"},
+							":role/cdk-*-lookup-role-*",
+						}},
+					},
+				},
+			}),
+		},
+	})
+
+	// Nenhuma política de role de diff pode alcançar as roles cdk-* de escrita.
+	politicas := tpl.FindResources(jsii.String("AWS::IAM::Policy"), map[string]interface{}{})
+	diffs := 0
+	for nome, v := range *politicas {
+		props := (*v)["Properties"].(map[string]interface{})
+		ref := props["Roles"].([]interface{})[0].(map[string]interface{})["Ref"].(string)
+		if len(ref) < len("ghdiff") || ref[:len("ghdiff")] != "ghdiff" {
+			continue
+		}
+		diffs++
+		for _, st := range props["PolicyDocument"].(map[string]interface{})["Statement"].([]interface{}) {
+			if st.(map[string]interface{})["Sid"] == "AssumirRolesDoBootstrapCdk" {
+				t.Errorf("a política %s da role de diff pode assumir todas as roles cdk-*", nome)
+			}
+		}
+	}
+	if diffs != len(ReposComCdk) {
+		t.Fatalf("políticas de roles de diff: esperado %d, obtido %d", len(ReposComCdk), diffs)
+	}
 }
 
 func TestCicdRolesSoAssumemAsRolesDoBootstrap(t *testing.T) {
@@ -126,9 +189,9 @@ func TestCicdSoOFrontendTemPermissaoNoAmplify(t *testing.T) {
 		},
 	})
 
-	// Uma política por role do frontend (dev e prod).
-	if got := len(*comAmplify); got != 2 {
-		t.Fatalf("políticas com permissão no Amplify: esperado 2 (frontend dev e prod), obtido %d", got)
+	// Uma política por role do frontend (só dev).
+	if got := len(*comAmplify); got != 1 {
+		t.Fatalf("políticas com permissão no Amplify: esperado 1 (frontend dev), obtido %d", got)
 	}
 	for _, v := range *comAmplify {
 		roles := (*v)["Properties"].(map[string]interface{})["Roles"].([]interface{})

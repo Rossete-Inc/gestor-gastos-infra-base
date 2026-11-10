@@ -7,8 +7,9 @@ import (
 	"github.com/aws/jsii-runtime-go"
 )
 
-// NovaStackCicd cria o OIDC provider do GitHub e uma role de deploy por
-// repositório implantável e ambiente (ADR 0007).
+// NovaStackCicd cria o OIDC provider do GitHub, uma role de deploy por
+// repositório implantável e ambiente e uma role só leitura por repositório com
+// CDK, usada pelo `cdk diff` nos PRs (ADR 0007).
 //
 // A stack é da conta, não de um ambiente: é implantada uma única vez, à mão,
 // logo depois do `cdk bootstrap` (ver infra/README.md). Depois disso, o próprio
@@ -33,6 +34,9 @@ func NovaStackCicd(scope constructs.Construct, id string, props *awscdk.StackPro
 			novaRoleDeploy(stack, provider, repo, env)
 		}
 	}
+	for _, repo := range ReposComCdk {
+		novaRoleDiff(stack, provider, repo)
+	}
 
 	return stack
 }
@@ -40,16 +44,9 @@ func NovaStackCicd(scope constructs.Construct, id string, props *awscdk.StackPro
 func novaRoleDeploy(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo, env string) awsiam.Role {
 	nome := NomeRoleDeploy(repo, env)
 
-	principal := awsiam.NewWebIdentityPrincipal(provider.AttrArn(), &map[string]interface{}{
-		"StringEquals": map[string]interface{}{
-			GitHubOIDCHost + ":aud": GitHubOIDCAudience,
-			GitHubOIDCHost + ":sub": SubjectOIDC(repo, env),
-		},
-	})
-
 	role := awsiam.NewRole(stack, jsii.String(nome), &awsiam.RoleProps{
 		RoleName:           jsii.String(nome),
-		AssumedBy:          principal,
+		AssumedBy:          principalGitHub(provider, SubjectOIDC(repo, env)),
 		Description:        jsii.String("Deploy do " + repo + " em " + env + " pelo GitHub Actions (OIDC)"),
 		MaxSessionDuration: awscdk.Duration_Hours(jsii.Number(1)),
 	})
@@ -100,6 +97,64 @@ func novaRoleDeploy(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo, e
 	}
 
 	// Saída informativa (sem exportName: nunca usamos CloudFormation exports).
+	awscdk.NewCfnOutput(stack, jsii.String(nome+"-arn"), &awscdk.CfnOutputProps{
+		Value:       role.RoleArn(),
+		Description: jsii.String("ARN da role " + nome),
+	})
+
+	return role
+}
+
+// principalGitHub aceita só tokens do GitHub Actions com a audience do
+// configure-aws-credentials e a claim `sub` exata informada.
+func principalGitHub(provider awsiam.CfnOIDCProvider, sub string) awsiam.IPrincipal {
+	return awsiam.NewWebIdentityPrincipal(provider.AttrArn(), &map[string]interface{}{
+		"StringEquals": map[string]interface{}{
+			GitHubOIDCHost + ":aud": GitHubOIDCAudience,
+			GitHubOIDCHost + ":sub": sub,
+		},
+	})
+}
+
+// novaRoleDiff cria a role que o job de `cdk diff` assume em PRs. Ela não passa
+// por GitHub Environment (a trust aceita o `sub` de pull_request, de qualquer
+// branch do próprio repositório) e, por isso, não tem nenhuma permissão de escrita:
+// só assume a lookup role do bootstrap, que é ReadOnlyAccess, e lê templates
+// e parâmetros. O diff roda com `--method=template`, sem change set.
+func novaRoleDiff(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo string) awsiam.Role {
+	nome := NomeRoleDiff(repo)
+	conta := *awscdk.Aws_ACCOUNT_ID()
+	particao := *awscdk.Aws_PARTITION()
+	regiao := *awscdk.Aws_REGION()
+
+	role := awsiam.NewRole(stack, jsii.String(nome), &awsiam.RoleProps{
+		RoleName:           jsii.String(nome),
+		AssumedBy:          principalGitHub(provider, SubjectOIDCPullRequest(repo)),
+		Description:        jsii.String("cdk diff (so leitura) do " + repo + " em PRs pelo GitHub Actions (OIDC)"),
+		MaxSessionDuration: awscdk.Duration_Hours(jsii.Number(1)),
+	})
+
+	role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+		Sid:       jsii.String("AssumirLookupRoleDoBootstrap"),
+		Actions:   jsii.Strings("sts:AssumeRole", "sts:TagSession"),
+		Resources: jsii.Strings("arn:" + particao + ":iam::" + conta + ":role/cdk-*-lookup-role-*"),
+	}))
+
+	role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+		Sid:       jsii.String("LerStacks"),
+		Actions:   jsii.Strings("cloudformation:DescribeStacks", "cloudformation:GetTemplate"),
+		Resources: jsii.Strings("arn:" + particao + ":cloudformation:" + regiao + ":" + conta + ":stack/" + Projeto + "-*/*"),
+	}))
+
+	role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+		Sid:     jsii.String("LerParametros"),
+		Actions: jsii.Strings("ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"),
+		Resources: jsii.Strings(
+			"arn:"+particao+":ssm:"+regiao+":"+conta+":parameter/"+Projeto+"/*",
+			"arn:"+particao+":ssm:"+regiao+":"+conta+":parameter/cdk-bootstrap/*",
+		),
+	}))
+
 	awscdk.NewCfnOutput(stack, jsii.String(nome+"-arn"), &awscdk.CfnOutputProps{
 		Value:       role.RoleArn(),
 		Description: jsii.String("ARN da role " + nome),
