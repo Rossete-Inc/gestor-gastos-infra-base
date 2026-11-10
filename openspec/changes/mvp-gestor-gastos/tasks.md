@@ -60,7 +60,8 @@
 - [x] 6.3 infra-base: workflows reutilizáveis `go-service.yml` (vet, golangci-lint, test, build arm64, synth/diff no PR, checagem de "Validado localmente", deploy em `dev` na `main` com environment, `concurrency` por repositório) e `frontend.yml` (tsc, eslint, jest, boundaries, `expo export -p web`, `amplify create-deployment`); verificar com `actionlint` e rodando no próprio infra-base
 - [x] 6.4 infra-base: stacks `auth` (User Pool com SRP, access token de 15 min, grupos), `events` (barramento com DLQ), `api` (HTTP API, authorizer JWT, CORS, throttling), trigger Post Confirmation em Go e parâmetros no SSM; testes de assertion, verificar que uma chamada sem token recebe 401 e `aws ssm get-parameters-by-path`
   - Stacks `gestor-gastos-dev-events`, `-auth` e `-api` implantadas à mão em 2026-11-10; 12 parâmetros em `/gestor-gastos/dev/` e 401 sem token em `GET /infra/auth-check`.
-- [ ] 6.5 users-service e BFF: CDK (tabela on-demand com RETAIN, Lambda arm64 256 MB com alias `live`, CodeDeploy canary, logs 7 dias, regra do EventBridge, ARNs no SSM, falha clara quando faltar parâmetro); deploy em `dev` pela esteira e smoke test de `GET /me` com token real
+- [x] 6.5 users-service e BFF: CDK (tabela on-demand com RETAIN, Lambda arm64 256 MB com alias `live`, CodeDeploy canary, logs 7 dias, regra do EventBridge, ARNs no SSM, falha clara quando faltar parâmetro); deploy em `dev` pela esteira e smoke test de `GET /me` com token real
+  - Deploy em `dev` pela esteira em 2026-11-10 (users-service #4, bff #5, infra-base #16); smoke test: `GET /me` 401 sem token e 200 com token real.
 - [ ] 6.6 frontend: Amplify Hosting com rewrite SPA e deploy em `dev`; criar o primeiro admin via CLI e documentar em `docs/`; o usuário repete o roteiro da 5.8 em `dev`
 
 ## 7. Fatia 2 — Categorias
