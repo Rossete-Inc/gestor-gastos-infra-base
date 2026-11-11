@@ -1,8 +1,8 @@
 # 0005 - react-native-gifted-charts para gráficos
 
-- **Status:** Proposta
+- **Status:** Aceito em 2026-11-11 e movido para o `gestor-gastos-frontend`
 
-> Este ADR será movido para o repositório `gestor-gastos-frontend` quando ele for criado (ADR 0006).
+> **A versão vigente está em [`gestor-gastos-frontend/docs/adr/0005-grafico-react-native-gifted-charts.md`](https://github.com/Rossete-Inc/gestor-gastos-frontend/blob/main/docs/adr/0005-grafico-react-native-gifted-charts.md)** (ADR 0006). Este arquivo fica só como registro da proposta.
 - **Data:** 2026-11-04
 
 ## Contexto

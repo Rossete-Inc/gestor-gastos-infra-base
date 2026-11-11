@@ -76,16 +76,16 @@
 
 ## 8. Fatia 3 — Lançamento de gastos
 
-- [ ] 8.1 expenses-service: domínio (validações de valor, data, descrição e recorrência; grupo desnormalizado) com testes cobrindo os cenários da spec `lancamento-gastos`
-- [ ] 8.2 expenses-service: store DynamoDB (`PK=USER#id`, `SK=EXP#AAAA-MM-DD#ulid`) com CRUD, listagem paginada, filtros por grupo e categoria, `ExisteGastoNaCategoria`, consumidor de `UserDeleted` (lotes, idempotente) e `cmd/local`; testes com DynamoDB Local, incluindo o isolamento entre usuários (404)
-- [ ] 8.3 BFF: `/gastos` (POST, PUT, DELETE) com validação de categoria, `/telas/gastos`, e bloqueio de exclusão de categoria em uso; testes cobrindo os cenários das specs
+- [x] 8.1 expenses-service: domínio (validações de valor, data, descrição e recorrência; grupo desnormalizado) com testes cobrindo os cenários da spec `lancamento-gastos`
+- [x] 8.2 expenses-service: store DynamoDB (`PK=USER#id`, `SK=EXP#AAAA-MM-DD#ulid`) com CRUD, listagem paginada, filtros por grupo e categoria, `ExisteGastoNaCategoria`, consumidor de `UserDeleted` (lotes, idempotente) e `cmd/local`; testes com DynamoDB Local, incluindo o isolamento entre usuários (404)
+- [x] 8.3 BFF: `/gastos` (POST, PUT, DELETE) com validação de categoria, `/telas/gastos`, e bloqueio de exclusão de categoria em uso; testes cobrindo os cenários das specs
 - [ ] 8.4 frontend: feature `lancamento-gastos` (formulário com máscara de moeda, lista com filtros e paginação, edição, exclusão com confirmação, invalidação de queries); testes com MSW
 - [ ] 8.5 Deploy em `dev`: CDK do expenses-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
 - [ ] 8.6 **Validação em `dev` pelo usuário:** lançar gasto de cartão e fixo, filtrar, paginar, editar, excluir e tentar excluir uma categoria em uso. O usuário aprova
 
 ## 9. Fatia 4 — Painel
 
-- [ ] 9.1 expenses-service: `ResumoMensal` (totais por grupo e por categoria, 5 mais recentes); testes com somas em centavos e mês vazio
+- [x] 9.1 expenses-service: `ResumoMensal` (totais por grupo e por categoria, 5 mais recentes); testes com somas em centavos e mês vazio
 - [ ] 9.2 BFF: `/telas/dashboard` com chamadas paralelas e percentuais pelo maior resto; testes cobrindo a soma de 100% e o mês vazio
 - [ ] 9.3 frontend: aceitar o ADR 0005 e criar a feature `dashboard` (seletor de mês, totais, pizza com alternância todas/CARTAO/FIXO, últimos 5, estado vazio); testes com MSW
 - [ ] 9.4 Deploy em `dev` do expenses-service, BFF e frontend; smoke test
@@ -114,6 +114,6 @@
 
 ## Workflow follow-up
 
-- Aceitar o ADR 0005 (biblioteca de gráficos) e movê-lo para o repositório do frontend antes da tarefa 9.3.
+- ~~Aceitar o ADR 0005 (biblioteca de gráficos) e movê-lo para o repositório do frontend antes da tarefa 9.3.~~ Aceito em 2026-11-11; a versão vigente está em `gestor-gastos-frontend/docs/adr/`.
 - Registrar a decisão de execução local e entrega em fatias num ADR 0008 e atualizar `docs/plano.md` (fases) e `docs/diagramas.md` (CI/CD).
 - Arquivar a change com `/opsx:archive` após a revisão, sincronizando as specs em `openspec/specs/`.
