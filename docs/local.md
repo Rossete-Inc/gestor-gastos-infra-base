@@ -1,6 +1,6 @@
 # Ambiente local
 
-Todo o Gestor de Gastos roda na sua máquina sem conta nem credencial da AWS. O DynamoDB e o Cognito são emulados em Docker, e cada serviço, o BFF e o app rodam direto do código. Cada fatia é validada aqui antes de subir para `dev`. O porquê está no design da change `mvp-gestor-gastos`, seção "Execução local e entrega em fatias".
+Todo o Gestor de Gastos roda na sua máquina sem conta nem credencial da AWS. O DynamoDB e o Cognito são emulados em Docker, e cada serviço, o BFF e o app rodam direto do código. É onde cada fatia é desenvolvida e testada; desde 2026-11-11 a validação do usuário é feita em `dev`. O porquê está no design da change `mvp-gestor-gastos`, seção "Execução local e entrega em fatias".
 
 ## Pré-requisitos
 

@@ -6,7 +6,7 @@ Os repositórios do Gestor de Gastos não escrevem a própria esteira: eles cham
 |---|---|---|
 | [`go-service.yml`](../.github/workflows/go-service.yml) | users-service, categories-service, expenses-service, BFF, go-commons e, mais tarde, o próprio infra-base | `go mod tidy`, `gofmt`, `go vet`, `golangci-lint`, `go test` com cobertura, build arm64 das Lambdas, `cdk synth` + `cdk diff` comentado no PR e `cdk deploy` em dev |
 | [`frontend.yml`](../.github/workflows/frontend.yml) | frontend | `tsc`, `eslint`, `prettier`, `check_boundaries.py`, `jest`, `expo export -p web` e deploy no Amplify Hosting |
-| [`ci.yml`](../.github/workflows/ci.yml) | só este repositório | `actionlint` (com `shellcheck`) em todos os workflows, checagem de "Validado localmente" e `go mod tidy`, `gofmt`, `go vet` e testes da Lambda do trigger e do CDK (`infra/`) |
+| [`ci.yml`](../.github/workflows/ci.yml) | só este repositório | `actionlint` (com `shellcheck`) em todos os workflows e `go mod tidy`, `gofmt`, `go vet` e testes da Lambda do trigger e do CDK (`infra/`) |
 
 ## Gatilhos
 
@@ -14,7 +14,7 @@ A AWS tem um ambiente só, **dev** ([ADR 0007](adr/0007-esteira-ci-cd.md), atual
 
 | Evento | Jobs |
 |---|---|
-| `pull_request` | Validado localmente, qualidade, build e `cdk synth` + `cdk diff` contra dev (comentário no PR, atualizado a cada push). No front: as verificações e o `expo export`. Sem deploy |
+| `pull_request` | Qualidade, build e `cdk synth` + `cdk diff` contra dev (comentário no PR, atualizado a cada push). No front: as verificações e o `expo export`. Sem deploy |
 | `push` na `main` | Qualidade, build e deploy em **dev** (Environment `dev`, sem aprovação manual) + smoke test |
 
 Tags `vX.Y.Z` não fazem deploy. A `go-commons` continua publicando tags semver, mas como biblioteca.
@@ -23,7 +23,7 @@ Tags `vX.Y.Z` não fazem deploy. A `go-commons` continua publicando tags semver,
 - **Credenciais:** OIDC na conta `vars.AWS_ACCOUNT_ID`, região `us-east-1`. O `<repo>` vem de `github.event.repository.name`. Nenhum segredo é usado.
   - **Deploy:** role `gh-deploy-<repo>-dev`, cuja trust aceita só `repo:Rossete-Inc@339323229/<repo>@<repo-id>:environment:dev`. Por isso o job de deploy usa o Environment `dev`.
   - **`cdk diff` no PR:** role só leitura `gh-diff-<repo>`, cuja trust aceita só `repo:Rossete-Inc@339323229/<repo>@<repo-id>:pull_request`. É o `sub` que o GitHub emite em `pull_request` para um job **sem** `environment:`, por isso o job de diff não usa Environment. A role só assume a lookup role do bootstrap do CDK (`cdk-*-lookup-role-*`) e lê templates do CloudFormation e o SSM `/gestor-gastos/*`. Sem permissão para criar change set, o diff roda com `--method=template`, comparando com o template implantado.
-- **Validado localmente:** o job reprova o PR que tenha **Funcionalidade** ou **Correção** marcada (ou nenhum tipo marcado) sem `- [x] Validado localmente` no corpo. PR só de **Infraestrutura / CI** ou **Documentação** fica dispensado. Para o job rodar de novo quando o corpo é editado, inclua `edited` nos `types` do `pull_request`.
+- **Validação pelo usuário:** é feita em **dev**, depois do merge e do deploy, e não na esteira. A checagem de "Validado localmente" no corpo do PR saiu em 2026-11-11, por decisão do usuário.
 
 ## Serviço Go
 
@@ -74,8 +74,6 @@ Para a `go-commons`, que não tem deploy: `lambdas: ""` e `cdk-dir: ""`. Ficam s
 | `cdk-args` | string | `""` | Argumentos extras de `cdk synth`, `diff` e `deploy` |
 | `node-version` | string | `24` | Node do CLI do CDK |
 | `smoke-test` | string | `""` | Comando bash rodado na raiz após o deploy, com as credenciais do ambiente e `AMBIENTE=dev` |
-| `exigir-validacao-local` | boolean | `true` | Liga a checagem de "Validado localmente" |
-
 ### Contrato com o CDK do serviço
 
 - O app CDK lê o ambiente do contexto `env` (`cdk deploy --all --context env=dev`). A variável `AMBIENTE` também fica disponível.
@@ -131,8 +129,6 @@ O app do Amplify (plataforma `WEB`, sem repositório conectado, branch `main`, r
 | `amplify-app-id-ssm` | string | `/gestor-gastos/{env}/frontend/amplify-app-id` | Parâmetro do SSM com o id do app no Amplify |
 | `amplify-branch` | string | `main` | Branch do app no Amplify que recebe o deploy |
 | `smoke-test` | string | `""` | Comando bash após o deploy, com `AMBIENTE` e `APP_URL` |
-| `exigir-validacao-local` | boolean | `true` | Liga a checagem de "Validado localmente" |
-
 Os scripts esperados no `package.json` são `typecheck`, `lint`, `check:boundaries` e `test:ci`. O `format:check` roda se existir.
 
 ### De onde vem o id do app no Amplify
@@ -152,7 +148,7 @@ Se nenhum dos dois existir, o deploy falha com mensagem clara. O deploy segue o 
 | Repositório → Environments → `dev` | Sem revisores, com a regra de deploy restrita à branch `main`. É o único Environment: o `cdk diff` do PR não usa Environment |
 | Environment `dev` → Variables (só o front, opcional) | `AMPLIFY_APP_ID`, se não quiser ler do SSM |
 | AWS (stack `cicd`, tarefa 6.2) | Role de deploy `gh-deploy-<repo>-dev` e, nos repositórios com CDK (infra-base, serviços e BFF), a role só leitura `gh-diff-<repo>` |
-| Branch protection da `main` | Exigir os checks da esteira (`esteira / vet, lint e testes`, `esteira / Validado localmente` etc.) |
+| Branch protection da `main` | Exigir os checks da esteira (`esteira / vet, lint e testes`, `esteira / tsc, eslint, fronteiras, jest e expo export` etc.) |
 
 ### Limitações conhecidas
 
