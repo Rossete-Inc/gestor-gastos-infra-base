@@ -1,6 +1,6 @@
 # Tasks
 
-> Cada grupo indica o repositório da org Rossete-Inc onde o trabalho acontece. A entrega é feita em **fatias verticais** (design.md, seção "Execução local e entrega em fatias"). Cada fatia roda localmente, é **validada pelo usuário** e só depois sobe para `dev`. Nenhuma tarefa de fatia toca a AWS antes da sua validação local.
+> Cada grupo indica o repositório da org Rossete-Inc onde o trabalho acontece. A entrega é feita em **fatias verticais** (design.md, seção "Execução local e entrega em fatias"). Cada fatia roda localmente para o desenvolvimento e os testes. **Desde 2026-11-11 (decisão do usuário), a validação do usuário é feita em `dev`:** a fatia sobe pela esteira no merge e o usuário valida lá. Por isso, nas fatias 2 em diante, o deploy vem antes da validação.
 
 ## 1. Fundação GitHub (sem AWS)
 
@@ -69,10 +69,10 @@
 
 - [x] 7.1 categories-service: domínio (grupos válidos, padrão imutável, nome único por grupo ignorando caixa, visibilidade por usuário) com testes cobrindo os cenários da spec `categorias`
 - [x] 7.2 categories-service: store DynamoDB (`PK=SYSTEM|USER#id`, `SK=CAT#grupo#id`), seed idempotente das categorias padrão, handler (ListarCategorias, ObterCategoria, CriarCategoria, ExcluirCategoria), consumidor de `UserDeleted` e `cmd/local`; testes com DynamoDB Local
-- [ ] 7.3 BFF: `/categorias` (GET, POST, DELETE) e `/telas/gasto-form`; testes com clients mockados
-- [ ] 7.4 frontend: feature `categorias` (lista por grupo, criar, excluir personalizada com confirmação); testes com MSW
-- [ ] 7.5 **Validação local pelo usuário:** listar padrão e personalizadas, criar categoria, tentar duplicar o nome, excluir. O usuário aprova
-- [ ] 7.6 Deploy em `dev`: CDK do categories-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
+- [x] 7.3 BFF: `/categorias` (GET, POST, DELETE) e `/telas/gasto-form`; testes com clients mockados
+- [x] 7.4 frontend: feature `categorias` (lista por grupo, criar, excluir personalizada com confirmação); testes com MSW
+- [ ] 7.5 Deploy em `dev`: CDK do categories-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
+- [ ] 7.6 **Validação em `dev` pelo usuário:** listar padrão e personalizadas, criar categoria, tentar duplicar o nome, excluir. O usuário aprova
 
 ## 8. Fatia 3 — Lançamento de gastos
 
@@ -80,30 +80,30 @@
 - [ ] 8.2 expenses-service: store DynamoDB (`PK=USER#id`, `SK=EXP#AAAA-MM-DD#ulid`) com CRUD, listagem paginada, filtros por grupo e categoria, `ExisteGastoNaCategoria`, consumidor de `UserDeleted` (lotes, idempotente) e `cmd/local`; testes com DynamoDB Local, incluindo o isolamento entre usuários (404)
 - [ ] 8.3 BFF: `/gastos` (POST, PUT, DELETE) com validação de categoria, `/telas/gastos`, e bloqueio de exclusão de categoria em uso; testes cobrindo os cenários das specs
 - [ ] 8.4 frontend: feature `lancamento-gastos` (formulário com máscara de moeda, lista com filtros e paginação, edição, exclusão com confirmação, invalidação de queries); testes com MSW
-- [ ] 8.5 **Validação local pelo usuário:** lançar gasto de cartão e fixo, filtrar, paginar, editar, excluir e tentar excluir uma categoria em uso. O usuário aprova
-- [ ] 8.6 Deploy em `dev`: CDK do expenses-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
+- [ ] 8.5 Deploy em `dev`: CDK do expenses-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
+- [ ] 8.6 **Validação em `dev` pelo usuário:** lançar gasto de cartão e fixo, filtrar, paginar, editar, excluir e tentar excluir uma categoria em uso. O usuário aprova
 
 ## 9. Fatia 4 — Painel
 
 - [ ] 9.1 expenses-service: `ResumoMensal` (totais por grupo e por categoria, 5 mais recentes); testes com somas em centavos e mês vazio
 - [ ] 9.2 BFF: `/telas/dashboard` com chamadas paralelas e percentuais pelo maior resto; testes cobrindo a soma de 100% e o mês vazio
 - [ ] 9.3 frontend: aceitar o ADR 0005 e criar a feature `dashboard` (seletor de mês, totais, pizza com alternância todas/CARTAO/FIXO, últimos 5, estado vazio); testes com MSW
-- [ ] 9.4 **Validação local pelo usuário:** conferir totais e pizza contra os gastos lançados, trocar de mês e ver o mês vazio. O usuário aprova
-- [ ] 9.5 Deploy em `dev` do expenses-service, BFF e frontend; smoke test
+- [ ] 9.4 Deploy em `dev` do expenses-service, BFF e frontend; smoke test
+- [ ] 9.5 **Validação em `dev` pelo usuário:** conferir totais e pizza contra os gastos lançados, trocar de mês e ver o mês vazio. O usuário aprova
 
 ## 10. Fatia 5 — Administração
 
 - [ ] 10.1 users-service: regras do último admin e de não bloquear a si mesmo, operações no Cognito (disable/enable + global sign-out, troca de grupo, delete) atrás de uma interface, com adaptador fake para o que o cognito-local não suportar, e publicação de `UserDeleted`; testes com client Cognito mockado
 - [ ] 10.2 BFF: `/admin/telas/usuarios` e `/admin/usuarios/{id}` (PATCH, DELETE); testes cobrindo 403 para cliente e os cenários da spec `gestao-usuarios`
 - [ ] 10.3 frontend: feature `admin` (lista paginada, bloquear/reativar, alterar papel, excluir), com rota visível só para admin; testes cobrindo o cliente sem acesso
-- [ ] 10.4 **Validação local pelo usuário:** bloquear → login recusado → reativar → login aceito; promover a admin; excluir usuário e ver os dados dele removidos. O usuário aprova
-- [ ] 10.5 Deploy em `dev` com as permissões Cognito Admin restritas ao pool; repetir o roteiro da 10.4 em `dev`, já que o Cognito real substitui o adaptador fake
+- [ ] 10.4 Deploy em `dev` com as permissões Cognito Admin restritas ao pool; smoke test
+- [ ] 10.5 **Validação em `dev` pelo usuário:** bloquear → login recusado → reativar → login aceito; promover a admin; excluir usuário e ver os dados dele removidos. O usuário aprova
 
 ## 11. PWA
 
 - [ ] 11.1 frontend: manifest, ícones, service worker (shell offline, aviso de offline, atualização de versão) e headers de cache; verificar localmente com `expo export -p web` servido localmente, Lighthouse PWA e acesso pelo celular na rede local
-- [ ] 11.2 **Validação local pelo usuário:** instalar pelo celular na rede local, abrir offline e ver o aviso. O usuário aprova
-- [ ] 11.3 Deploy em `dev` e instalação real em Android e iOS
+- [ ] 11.2 Deploy em `dev`
+- [ ] 11.3 **Validação em `dev` pelo usuário:** instalar em Android e iOS, abrir offline e ver o aviso. O usuário aprova
 
 ## 12. Integração ponta a ponta
 

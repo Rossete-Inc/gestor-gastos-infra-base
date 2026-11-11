@@ -70,10 +70,6 @@ on:
           AMBIENTE (sempre dev) e APP_URL (URL do Amplify). Vazio = sem smoke test.
         type: string
         default: ""
-      exigir-validacao-local:
-        description: Reprova o PR de funcionalidade/correção sem "- [x] Validado localmente" no corpo.
-        type: boolean
-        default: true
 
 permissions:
   contents: read
@@ -82,30 +78,6 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  validacao-local:
-    name: Validado localmente
-    if: github.event_name == 'pull_request' && inputs.exigir-validacao-local
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Checa o item "Validado localmente" no corpo do PR
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          corpo=$(printf '%s' "$PR_BODY" | tr -d '\r')
-          marcado() { grep -Eiq "^[[:space:]]*[-*][[:space:]]*\[[xX]\][[:space:]]*$1" <<<"$corpo"; }
-          if marcado 'Validado localmente'; then
-            echo "Item \"Validado localmente\" marcado."
-            exit 0
-          fi
-          # O template só exige o item para Funcionalidade e Correção.
-          if ! marcado 'Funcionalidade' && ! marcado 'Corre' && { marcado 'Infraestrutura' || marcado 'Documenta'; }; then
-            echo "::notice title=Validado localmente::PR só de infraestrutura/documentação: item dispensado."
-            exit 0
-          fi
-          echo "::error title=Validado localmente::O corpo do PR precisa ter '- [x] Validado localmente'. Rode o roteiro da fatia com 'task local:up', marque o item no PR e reexecute este job (ou edite o PR, se o workflow escuta 'edited')."
-          exit 1
-
   verificar:
     name: tsc, eslint, fronteiras, jest e expo export
     runs-on: ubuntu-latest

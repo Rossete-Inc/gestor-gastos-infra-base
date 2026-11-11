@@ -71,6 +71,8 @@ O `openapi.yaml` (BFF) é escrito primeiro e validado com lint no CI. O front ge
 ### Execução local e entrega em fatias
 Cada funcionalidade roda e é validada localmente pelo responsável antes de subir para a AWS. A entrega é organizada em **fatias verticais**. Cada fatia junta serviço + rotas do BFF + telas do front e só vai para `dev` depois da validação local.
 
+> **Atualização de 2026-11-11 (decisão do usuário):** a validação do usuário passa a ser feita em `dev`, depois do merge e do deploy pela esteira. O ambiente local continua sendo onde se desenvolve e se testa, mas deixou de ser portão para a nuvem. Saiu da esteira o job "Validado localmente" e, do template de PR, o item correspondente. Trade-off: um defeito que o roteiro do usuário pegaria localmente agora chega a `dev` antes; com um ambiente só e sem usuários reais, o risco é baixo, e o rollback é o próprio canary das Lambdas ou um novo merge.
+
 | Na nuvem | Localmente |
 |---|---|
 | DynamoDB | DynamoDB Local (Docker), com o dynamodb-admin para inspecionar |
@@ -88,7 +90,7 @@ Cada funcionalidade roda e é validada localmente pelo responsável antes de sub
   - O código de confirmação de e-mail aparece no log do cognito-local.
   - As operações de admin que o emulador não suportar usam um adaptador fake atrás da mesma interface.
 - **Portão para a nuvem:**
-  - O template de pull request tem o item "Validado localmente". Um job da esteira reprova o PR de funcionalidade sem esse item marcado.
+  - ~~O template de pull request tem o item "Validado localmente". Um job da esteira reprova o PR de funcionalidade sem esse item marcado.~~ Removido em 2026-11-11 (ver a atualização acima).
   - O merge na `main` continua implantando em `dev` automaticamente.
 - **Base na nuvem:** é montada uma única vez, logo depois que a fatia 1 é aprovada localmente. Fazem parte dela o bootstrap, o OIDC, o Budget, o Cognito, a API e o barramento.
 - **Alternativa descartada:** LocalStack, porque Cognito e outros serviços usados só existem na versão paga, e um ambiente local ainda mais fiel não compensa o custo.
