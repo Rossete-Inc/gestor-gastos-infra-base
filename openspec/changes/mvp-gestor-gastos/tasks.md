@@ -62,7 +62,8 @@
   - Stacks `gestor-gastos-dev-events`, `-auth` e `-api` implantadas à mão em 2026-11-10; 12 parâmetros em `/gestor-gastos/dev/` e 401 sem token em `GET /infra/auth-check`.
 - [x] 6.5 users-service e BFF: CDK (tabela on-demand com RETAIN, Lambda arm64 256 MB com alias `live`, CodeDeploy canary, logs 7 dias, regra do EventBridge, ARNs no SSM, falha clara quando faltar parâmetro); deploy em `dev` pela esteira e smoke test de `GET /me` com token real
   - Deploy em `dev` pela esteira em 2026-11-10 (users-service #4, bff #5, infra-base #16); smoke test: `GET /me` 401 sem token e 200 com token real.
-- [ ] 6.6 frontend: Amplify Hosting com rewrite SPA e deploy em `dev`; criar o primeiro admin via CLI e documentar em `docs/`; o usuário repete o roteiro da 5.8 em `dev`
+- [x] 6.6 frontend: Amplify Hosting com rewrite SPA e deploy em `dev`; criar o primeiro admin via CLI e documentar em `docs/`; o usuário repete o roteiro da 5.8 em `dev`
+  - Stack `gestor-gastos-dev-web` e CORS da `api` implantados à mão em 2026-11-11; deploy do frontend pela esteira (site `https://main.d29nhf1m2otvy2.amplifyapp.com`); primeiro admin criado pelo `docs/primeiro-admin.md` e roteiro da 5.8 validado pelo usuário em `dev`.
 
 ## 7. Fatia 2 — Categorias
 
