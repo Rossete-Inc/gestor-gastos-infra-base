@@ -71,7 +71,7 @@
 - [x] 7.2 categories-service: store DynamoDB (`PK=SYSTEM|USER#id`, `SK=CAT#grupo#id`), seed idempotente das categorias padrão, handler (ListarCategorias, ObterCategoria, CriarCategoria, ExcluirCategoria), consumidor de `UserDeleted` e `cmd/local`; testes com DynamoDB Local
 - [x] 7.3 BFF: `/categorias` (GET, POST, DELETE) e `/telas/gasto-form`; testes com clients mockados
 - [x] 7.4 frontend: feature `categorias` (lista por grupo, criar, excluir personalizada com confirmação); testes com MSW
-- [ ] 7.5 Deploy em `dev`: CDK do categories-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
+- [x] 7.5 Deploy em `dev`: CDK do categories-service no padrão da 6.5, BFF e frontend pela esteira; smoke test
 - [ ] 7.6 **Validação em `dev` pelo usuário:** listar padrão e personalizadas, criar categoria, tentar duplicar o nome, excluir. O usuário aprova
 
 ## 8. Fatia 3 — Lançamento de gastos
