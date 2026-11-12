@@ -101,8 +101,8 @@
 
 ## 11. PWA
 
-- [ ] 11.1 frontend: manifest, ícones, service worker (shell offline, aviso de offline, atualização de versão) e headers de cache; verificar localmente com `expo export -p web` servido localmente, Lighthouse PWA e acesso pelo celular na rede local
-- [ ] 11.2 Deploy em `dev`
+- [x] 11.1 frontend: manifest, ícones, service worker (shell offline, aviso de offline, atualização de versão) e headers de cache; verificar localmente com `expo export -p web` servido localmente, Lighthouse PWA e acesso pelo celular na rede local
+- [x] 11.2 Deploy em `dev`
 - [ ] 11.3 **Validação em `dev` pelo usuário:** instalar em Android e iOS, abrir offline e ver o aviso. O usuário aprova
 
 ## 12. Integração ponta a ponta
