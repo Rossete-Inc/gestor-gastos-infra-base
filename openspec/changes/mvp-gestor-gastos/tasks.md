@@ -107,7 +107,7 @@
 
 ## 12. Integração ponta a ponta
 
-- [ ] 12.1 E2E Playwright rodando no ambiente local e em `dev`: cadastro → confirmação → login → lançar gasto → ver no painel e na pizza → editar → excluir; o teste passa na esteira do frontend
+- [x] 12.1 E2E Playwright rodando no ambiente local e em `dev`: cadastro → confirmação → login → lançar gasto → ver no painel e na pizza → editar → excluir; o teste passa na esteira do frontend
 - [ ] 12.2 E2E admin em `dev`: admin bloqueia usuário → login recusado → reativa → login aceito; admin exclui usuário → dados removidos; o teste passa
 - [ ] 12.3 Implantar a versão final de todos os repositórios em `dev` pela `main`; verificar o smoke test e o canary concluído em cada um
 - [ ] 12.4 Após 7 dias, conferir no Cost Explorer que o custo está dentro do orçamento; registrar o resultado em `docs/`
