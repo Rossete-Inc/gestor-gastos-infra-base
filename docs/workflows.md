@@ -125,6 +125,7 @@ O app do Amplify (plataforma `WEB`, sem repositório conectado, branch `main`, r
 | `env-build-pr` | string | valores locais (`EXPO_PUBLIC_APP_ENV=local`, API em `127.0.0.1:8080`, cognito-local) | Linhas `NOME=valor` do `expo export` de verificação |
 | `env-ssm` | string | `""` | Linhas `NOME=/caminho/ssm` lidas antes do build de deploy. `{env}` vira `dev`. Parâmetro ausente reprova o deploy com mensagem clara |
 | `env-deploy` | string | `EXPO_PUBLIC_APP_ENV={env}` e `EXPO_PUBLIC_COGNITO_REGION=us-east-1` | Linhas `NOME=valor` fixas do build de deploy |
+| `pos-export` | string | `""` | Comandos bash logo depois de cada `expo export` (verificação e deploy), com `DIST_DIR` definido. Ex.: gerar o service worker da PWA sobre o `dist` |
 | `dist-dir` | string | `dist` | Saída do `expo export` |
 | `amplify-app-id-ssm` | string | `/gestor-gastos/{env}/frontend/amplify-app-id` | Parâmetro do SSM com o id do app no Amplify |
 | `amplify-branch` | string | `main` | Branch do app no Amplify que recebe o deploy |

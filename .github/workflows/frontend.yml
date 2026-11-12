@@ -50,6 +50,13 @@ on:
         default: |
           EXPO_PUBLIC_APP_ENV={env}
           EXPO_PUBLIC_COGNITO_REGION=us-east-1
+      pos-export:
+        description: >-
+          Comandos bash rodados logo depois de cada expo export (verificação e
+          deploy), na raiz do repositório e com DIST_DIR definido. Ex.: gerar o
+          service worker da PWA sobre o dist (tarefa 11.1). Vazio = nada.
+        type: string
+        default: ""
       dist-dir:
         description: Pasta de saída do expo export.
         type: string
@@ -117,6 +124,12 @@ jobs:
           source <(grep -Ev '^[[:space:]]*(#|$)' <<<"$ENV_BUILD")
           set +a
           npx expo export -p web --output-dir "$DIST_DIR"
+      - name: pós-export
+        if: inputs.pos-export != ''
+        env:
+          POS_EXPORT: ${{ inputs.pos-export }}
+          DIST_DIR: ${{ inputs.dist-dir }}
+        run: bash -euo pipefail -c "$POS_EXPORT"
 
   deploy:
     # Ambiente único: push na main -> dev, sem aprovação manual (o Environment dev só aceita a main).
@@ -191,6 +204,11 @@ jobs:
           exit $falhou
       - name: expo export -p web
         run: npx expo export -p web --output-dir "$DIST_DIR"
+      - name: pós-export
+        if: inputs.pos-export != ''
+        env:
+          POS_EXPORT: ${{ inputs.pos-export }}
+        run: bash -euo pipefail -c "$POS_EXPORT"
       - name: Deploy no Amplify
         id: amplify
         run: |
