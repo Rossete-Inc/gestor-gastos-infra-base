@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-cdk-go/awscdk/v2"
@@ -230,6 +232,43 @@ func TestCicdE2EDoFrontendNoCognito(t *testing.T) {
 		ref := roles[0].(map[string]interface{})["Ref"].(string)
 		if len(ref) < len("ghdeploygestorgastosfrontend") || ref[:len("ghdeploygestorgastosfrontend")] != "ghdeploygestorgastosfrontend" {
 			t.Errorf("permissão do E2E anexada a uma role que não é do frontend: %s", ref)
+		}
+	}
+}
+
+func TestCicdE2ELeDadosSoDoFrontend(t *testing.T) {
+	tpl := novaStackCicdTeste(t)
+
+	comLeitura := tpl.FindResources(jsii.String("AWS::IAM::Policy"), map[string]interface{}{
+		"Properties": map[string]interface{}{
+			"PolicyDocument": map[string]interface{}{
+				"Statement": assertions.Match_ArrayWith(&[]interface{}{
+					assertions.Match_ObjectLike(&map[string]interface{}{
+						"Sid":    "E2ELeituraDosDados",
+						"Action": "dynamodb:Query",
+					}),
+				}),
+			},
+		},
+	})
+	if got := len(*comLeitura); got != 1 {
+		t.Fatalf("políticas com E2ELeituraDosDados: esperado 1 (frontend dev), obtido %d", got)
+	}
+	for _, v := range *comLeitura {
+		props := (*v)["Properties"].(map[string]interface{})
+		ref := props["Roles"].([]interface{})[0].(map[string]interface{})["Ref"].(string)
+		if !strings.HasPrefix(ref, "ghdeploygestorgastosfrontend") {
+			t.Errorf("leitura do DynamoDB anexada a uma role que não é do frontend: %s", ref)
+		}
+		// Só as tabelas de gastos e de categorias de dev, nunca "*".
+		doc, _ := json.Marshal(props["PolicyDocument"])
+		for _, esperado := range []string{":table/gestor-gastos-dev-expenses", ":table/gestor-gastos-dev-categories"} {
+			if !strings.Contains(string(doc), esperado) {
+				t.Errorf("a política não cita %s: %s", esperado, doc)
+			}
+		}
+		if strings.Contains(string(doc), ":table/*") || strings.Contains(string(doc), "dynamodb:*") {
+			t.Errorf("leitura do DynamoDB larga demais: %s", doc)
 		}
 	}
 }

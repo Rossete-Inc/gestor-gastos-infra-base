@@ -114,6 +114,8 @@ A role do **frontend** recebe também permissões no Amplify Hosting, porque o s
 
 Para o E2E (tarefas 12.1 e 12.2), que roda depois do deploy contra o site de `dev`, a role do frontend recebe ainda `cognito-idp:AdminGetUser`, `AdminCreateUser`, `AdminSetUserPassword`, `AdminInitiateAuth`, `AdminAddUserToGroup`, `AdminConfirmSignUp` e `AdminDeleteUser` em `arn:aws:cognito-idp:us-east-1:<conta>:userpool/*`. O teste cadastra um usuário pela tela e o confirma com `AdminConfirmSignUp`, já que o código vai por e-mail. Para limpar, usa um admin próprio do E2E (sem convite, senha aleatória a cada execução, grupo `admin`) e exclui o usuário de teste por `DELETE /admin/usuarios/{id}`, que também apaga os dados dele. `AdminDeleteUser` só é usado se o teste cair antes de o perfil existir.
 
+O E2E do admin (12.2) ainda prova que excluir um usuário apaga os dados dele: a role do frontend tem `dynamodb:Query` (só leitura) nas tabelas `gestor-gastos-<env>-expenses` e `gestor-gastos-<env>-categories`, e o teste consulta `PK=USER#<id>` nas duas até não sobrar nada.
+
 **Limite conhecido.** As roles de deploy assumem as roles `cdk-*` do bootstrap, que têm poder de administrador via CloudFormation. O que protege a conta é a trust por environment somada à regra do Environment `dev` (só a `main`, que é protegida e exige PR).
 
 ### Roles de `cdk diff`

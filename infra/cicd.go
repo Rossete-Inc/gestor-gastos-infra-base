@@ -122,6 +122,19 @@ func novaRoleDeploy(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo, e
 				"arn:" + *awscdk.Aws_PARTITION() + ":cognito-idp:" + *awscdk.Aws_REGION() + ":" + *awscdk.Aws_ACCOUNT_ID() + ":userpool/*",
 			),
 		}))
+
+		// O E2E do admin (12.2) prova que a exclusão apaga os dados: consulta
+		// PK=USER#<id> nas tabelas de gastos e de categorias até não sobrar
+		// nada. Só leitura (Query), só nessas duas tabelas do ambiente.
+		tabela := func(servico string) string {
+			return "arn:" + *awscdk.Aws_PARTITION() + ":dynamodb:" + *awscdk.Aws_REGION() + ":" +
+				*awscdk.Aws_ACCOUNT_ID() + ":table/" + Projeto + "-" + env + "-" + servico
+		}
+		role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+			Sid:       jsii.String("E2ELeituraDosDados"),
+			Actions:   jsii.Strings("dynamodb:Query"),
+			Resources: jsii.Strings(tabela("expenses"), tabela("categories")),
+		}))
 	}
 
 	// O smoke test do BFF (scripts/smoke.sh no gestor-gastos-bff) roda com esta
