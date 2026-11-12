@@ -115,5 +115,5 @@
 ## Workflow follow-up
 
 - ~~Aceitar o ADR 0005 (biblioteca de gráficos) e movê-lo para o repositório do frontend antes da tarefa 9.3.~~ Aceito em 2026-11-11; a versão vigente está em `gestor-gastos-frontend/docs/adr/`.
-- Registrar a decisão de execução local e entrega em fatias num ADR 0008 e atualizar `docs/plano.md` (fases) e `docs/diagramas.md` (CI/CD).
+- ~~Registrar a decisão de execução local e entrega em fatias num ADR 0008 e atualizar `docs/plano.md` (fases) e `docs/diagramas.md` (CI/CD).~~ Feito em 2026-11-12: `docs/adr/0008-execucao-local-e-entrega-em-fatias.md`.
 - Arquivar a change com `/opsx:archive` após a revisão, sincronizando as specs em `openspec/specs/`.
