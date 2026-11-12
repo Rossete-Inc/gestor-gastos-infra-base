@@ -202,6 +202,38 @@ func TestCicdSoOFrontendTemPermissaoNoAmplify(t *testing.T) {
 	}
 }
 
+func TestCicdE2EDoFrontendNoCognito(t *testing.T) {
+	tpl := novaStackCicdTeste(t)
+
+	comE2E := tpl.FindResources(jsii.String("AWS::IAM::Policy"), map[string]interface{}{
+		"Properties": map[string]interface{}{
+			"PolicyDocument": map[string]interface{}{
+				"Statement": assertions.Match_ArrayWith(&[]interface{}{
+					assertions.Match_ObjectLike(&map[string]interface{}{
+						"Sid": "E2ENoCognito",
+						"Action": assertions.Match_ArrayWith(&[]interface{}{
+							"cognito-idp:AdminInitiateAuth", "cognito-idp:AdminAddUserToGroup",
+							"cognito-idp:AdminConfirmSignUp", "cognito-idp:AdminDeleteUser",
+						}),
+					}),
+				}),
+			},
+		},
+	})
+
+	// Só a role de deploy do frontend (dev) recebe as permissões do E2E.
+	if got := len(*comE2E); got != 1 {
+		t.Fatalf("políticas com E2ENoCognito: esperado 1 (frontend dev), obtido %d", got)
+	}
+	for _, v := range *comE2E {
+		roles := (*v)["Properties"].(map[string]interface{})["Roles"].([]interface{})
+		ref := roles[0].(map[string]interface{})["Ref"].(string)
+		if len(ref) < len("ghdeploygestorgastosfrontend") || ref[:len("ghdeploygestorgastosfrontend")] != "ghdeploygestorgastosfrontend" {
+			t.Errorf("permissão do E2E anexada a uma role que não é do frontend: %s", ref)
+		}
+	}
+}
+
 func TestCicdSemCloudFormationExports(t *testing.T) {
 	tpl := novaStackCicdTeste(t)
 

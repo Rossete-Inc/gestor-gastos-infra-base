@@ -97,6 +97,33 @@ func novaRoleDeploy(stack awscdk.Stack, provider awsiam.CfnOIDCProvider, repo, e
 		}))
 	}
 
+	// O E2E do frontend (tarefas 12.1 e 12.2) roda com esta role depois do
+	// deploy, contra o site de dev. Ele cadastra um usuário pela tela e o
+	// confirma com AdminConfirmSignUp (o código vai por e-mail, que o teste não
+	// lê). Para limpar, usa um admin próprio do E2E, mantido como o usuário do
+	// smoke do BFF (criado sem convite, senha aleatória a cada execução, token
+	// com ADMIN_USER_PASSWORD_AUTH, grupo admin), e exclui o usuário de teste
+	// por DELETE /admin/usuarios/{id}, que também apaga os dados dele.
+	// AdminDeleteUser fica para o caso de o teste cair antes de o perfil existir.
+	// O pool é lido do SSM, por isso o escopo é userpool/* da conta.
+	if repo == RepoFrontend {
+		role.AddToPolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+			Sid: jsii.String("E2ENoCognito"),
+			Actions: jsii.Strings(
+				"cognito-idp:AdminGetUser",
+				"cognito-idp:AdminCreateUser",
+				"cognito-idp:AdminSetUserPassword",
+				"cognito-idp:AdminInitiateAuth",
+				"cognito-idp:AdminAddUserToGroup",
+				"cognito-idp:AdminConfirmSignUp",
+				"cognito-idp:AdminDeleteUser",
+			),
+			Resources: jsii.Strings(
+				"arn:" + *awscdk.Aws_PARTITION() + ":cognito-idp:" + *awscdk.Aws_REGION() + ":" + *awscdk.Aws_ACCOUNT_ID() + ":userpool/*",
+			),
+		}))
+	}
+
 	// O smoke test do BFF (scripts/smoke.sh no gestor-gastos-bff) roda com esta
 	// role depois do deploy: garante o usuário smoke-test@example.com, troca a
 	// senha por uma aleatória e pede um token com ADMIN_USER_PASSWORD_AUTH para
