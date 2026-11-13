@@ -91,12 +91,12 @@ gestor-gastos-frontend/     src/app/ rotas finas: (auth)/login, cadastro, confir
 
 ## Esteira CI/CD (ADR 0007)
 
-Todo deploy na AWS é automático, feito pelo **GitHub Actions + AWS CDK**. Ninguém faz deploy manual depois do bootstrap.
+O deploy dos serviços, do BFF e do frontend é automático, feito pelo **GitHub Actions + AWS CDK**. As stacks do próprio infra-base (`cicd`, `budget`, `auth`, `events`, `web`, `api`) ainda têm deploy manual, feito por um admin; o porquê está em `docs/workflows.md`.
 
 | Gatilho | O que roda | Destino |
 |---|---|---|
 | Pull request | Go: `go vet`, `golangci-lint`, `go test`, build arm64, `cdk synth` + `cdk diff` comentado no PR. Front: `tsc`, `eslint`, `jest`, `check_boundaries.py`. BFF: lint do `openapi.yaml` | Nenhum deploy |
-| Merge na `main` | Build + `cdk deploy` + canary CodeDeploy nas Lambdas + smoke test | **dev** automático |
+| Merge na `main` | Build + `cdk deploy` + canary CodeDeploy nas Lambdas + smoke test. Frontend: deploy no Amplify + smoke da PWA + E2E Playwright | **dev** automático |
 
 - **Credenciais:** OIDC do GitHub na AWS, sem access keys. Cada repositório tem a role de deploy `gh-deploy-<repo>-dev`, com trust restrita a `repo:Rossete-Inc@339323229/<repo>@<repo-id>:environment:dev`, e a role só leitura `gh-diff-<repo>` para o `cdk diff` do PR, com trust `repo:Rossete-Inc@339323229/<repo>@<repo-id>:pull_request`.
 - **Bootstrap (único passo manual, uma vez por conta):** `cdk bootstrap` + deploy local da stack `cicd` do infra-base, que cria o OIDC provider e as roles.
@@ -112,18 +112,21 @@ Criar arquivo novo via Figma MCP (skills `figma-create-new-file` + `figma-genera
 Os tokens do Figma viram `shared/ui/tokens` no front.
 
 ## Fases de entrega
-0. **Fundação** — criar os repositórios, ADRs, conta AWS + Budget, bootstrap (CDK + stack `cicd` com OIDC e roles), workflows reutilizáveis no infra-base e esteira em cada repositório; primeira tag da `go-commons`.
-1. **Figma** — design system + telas (acima).
-2. **Infra base** (`gestor-gastos-infra-base`) — Cognito (pool, client, grupos, trigger), HTTP API + authorizer, EventBridge, parâmetros no SSM. Tabelas DynamoDB ficam no repositório de cada serviço.
-3. **Serviços Go** — categories (com seed das padrão) → expenses → users; testes unitários do domínio + testes de store com DynamoDB Local.
-4. **BFF** — OpenAPI, handlers por tela, autorização admin, testes com clients mockados.
-5. **Front** — auth → formulário/lista de gastos → dashboard com pizza → categorias → admin; MSW para mock até o BFF subir.
-6. **PWA e deploy** — manifest, service worker, Amplify Hosting (`amplify.yml`, rewrite SPA, cache conforme guardrails).
-7. **E2E** — Playwright: cadastro → login → lançar gasto → ver na pizza; admin bloqueia usuário → login falha.
+
+A entrega é por **fatias verticais** (ADR 0008): cada fatia junta serviço + rotas do BFF + telas do front e vai de ponta a ponta antes da próxima. A lista de tarefas está em `openspec/changes/mvp-gestor-gastos/tasks.md`.
+
+0. **Fundação** — repositórios, ADRs, workflows reutilizáveis e esteira em cada repositório; ambiente local em Docker (`local/`, `docs/local.md`); `go-commons` com a primeira tag.
+1. **Figma** — design system + telas (acima). As telas que faltam seguem os PNGs de referência enquanto o plano Starter do Figma limitar o acesso.
+2. **Fatia 1, Autenticação e perfil** — users-service, `/me` no BFF, telas de login, cadastro e perfil.
+3. **Base na nuvem** — bootstrap, stack `cicd` (OIDC e roles), Budget, Cognito com trigger, HTTP API, EventBridge e SSM; deploy da fatia 1 em `dev`.
+4. **Fatias 2 a 5** — Categorias → Gastos → Painel (pizza com `react-native-gifted-charts`) → Administração. Cada uma: PR → merge → deploy em `dev` → validação do usuário em `dev`.
+5. **PWA** — manifest, service worker, headers de cache no Amplify.
+6. **Integração ponta a ponta** — E2E Playwright na esteira do frontend (cadastro → gasto → painel; admin bloqueia, reativa e exclui); versão final de todos os repositórios com smoke e canary; custo conferido após 7 dias.
 
 ## Verificação
 - Em cada repositório Go: `go test ./...`, `golangci-lint run` e `cdk synth` (no CI do próprio repositório).
 - Front: `npx tsc --noEmit`, `npx eslint .`, `npx jest`, e `python <skill>/scripts/check_boundaries.py .` no `gestor-gastos-frontend`.
-- Ambiente `dev` na AWS: merge na `main` de cada repositório na ordem infra-base → serviços → BFF → frontend, com a esteira fazendo o deploy; criar admin via CLI, rodar o E2E Playwright contra a URL do Amplify.
+- Ambiente `dev` na AWS: merge na `main` de cada repositório, com a esteira fazendo o deploy (no primeiro deploy, na ordem infra-base → serviços → BFF → frontend); o E2E Playwright roda na esteira do frontend contra a URL do Amplify, depois de cada deploy.
+- Cada fatia é validada pelo usuário em `dev` depois do merge (ADR 0008).
 - Instalar o PWA num Android e num iPhone (Adicionar à tela inicial) e validar login/lançamento.
 - Conferir no Cost Explorer após 1 semana que o custo está ~US$ 0.

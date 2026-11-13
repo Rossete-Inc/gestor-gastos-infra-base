@@ -6,7 +6,7 @@ Projeto greenfield (ver proposal.md, seção Why). As decisões de arquitetura j
 
 - `docs/plano.md`: arquitetura, modelo de dados, endpoints do BFF, telas e fases.
 - `docs/diagramas.md`: arquitetura, sequências de cada fluxo, ciclo de vida, navegação, ER e CI/CD.
-- ADRs 0001 (Go), 0002 (DynamoDB), 0003 (microserviços + BFF), 0004 (Lambda Invoke), 0005 (gráficos, proposta), 0006 (repositórios separados), 0007 (CI/CD).
+- ADRs 0001 (Go), 0002 (DynamoDB), 0003 (microserviços + BFF), 0004 (Lambda Invoke), 0005 (gráficos, proposta), 0006 (repositórios separados), 0007 (CI/CD), 0008 (execução local e entrega em fatias).
 - Front segue a skill `app-multiplataforma-guardrails` (Expo + RN + Expo Router, TanStack Query, Zod, `app → features → shared`).
 
 Esta change mora no `gestor-gastos-infra-base`, mas o trabalho se espalha pelos sete repositórios da org Rossete-Inc. Cada grupo de tarefas indica o repositório.
@@ -69,6 +69,8 @@ O `openapi.yaml` (BFF) é escrito primeiro e validado com lint no CI. O front ge
 - **Região:** toda a infraestrutura fica em **us-east-1**. É a região mais barata e com todos os serviços. A latência a partir do Brasil, de cerca de 120 ms, é aceitável para o MVP. `sa-east-1` custaria de 30% a 50% mais.
 
 ### Execução local e entrega em fatias
+Decisão registrada no ADR 0008 (`docs/adr/0008-execucao-local-e-entrega-em-fatias.md`).
+
 Cada funcionalidade roda e é validada localmente pelo responsável antes de subir para a AWS. A entrega é organizada em **fatias verticais**. Cada fatia junta serviço + rotas do BFF + telas do front e só vai para `dev` depois da validação local.
 
 > **Atualização de 2026-11-11 (decisão do usuário):** a validação do usuário passa a ser feita em `dev`, depois do merge e do deploy pela esteira. O ambiente local continua sendo onde se desenvolve e se testa, mas deixou de ser portão para a nuvem. Saiu da esteira o job "Validado localmente" e, do template de PR, o item correspondente. Trade-off: um defeito que o roteiro do usuário pegaria localmente agora chega a `dev` antes; com um ambiente só e sem usuários reais, o risco é baixo, e o rollback é o próprio canary das Lambdas ou um novo merge.

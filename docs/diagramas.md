@@ -364,7 +364,7 @@ erDiagram
 
 ## 12. CI/CD e ordem de deploy
 
-Todo deploy na AWS é automático (ADR 0007). A nuvem tem um ambiente só, `dev`, e tags não fazem deploy. A ordem só importa no primeiro deploy, por causa dos parâmetros no SSM.
+O deploy dos serviços, do BFF e do frontend é automático (ADR 0007); as stacks do infra-base ainda têm deploy manual. A nuvem tem um ambiente só, `dev`, e tags não fazem deploy. A entrega é por fatias verticais, e o usuário valida cada fatia em `dev`, depois do merge (ADR 0008). A ordem dos repositórios só importa no primeiro deploy, por causa dos parâmetros no SSM, e quando um PR depende de permissão nova na stack `cicd`.
 
 ```mermaid
 flowchart LR
@@ -377,6 +377,8 @@ flowchart LR
         alarme -- "sim" --> rollback["rollback automático"]
         alarme -- "não" --> ok["100% do tráfego"]
         ok --> smoke["smoke test dev"]
+        smoke --> e2e["frontend: E2E Playwright<br/>contra o site de dev"]
+        e2e --> validacao["validação da fatia<br/>pelo usuário em dev"]
     end
 
     subgraph ordem["Primeiro deploy em dev"]
@@ -385,6 +387,12 @@ flowchart LR
         o1 --> o2["2. users, categories,<br/>expenses services"]
         o2 --> o3["3. bff"]
         o3 --> o4["4. frontend"]
+    end
+
+    subgraph permissao["PR que depende de permissão nova"]
+        direction LR
+        p1["merge do PR<br/>do infra-base"] --> p2["cdk deploy cicd<br/>manual, por um admin"]
+        p2 --> p3["merge do PR<br/>dependente"]
     end
 ```
 
