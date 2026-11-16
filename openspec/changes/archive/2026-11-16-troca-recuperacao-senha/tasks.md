@@ -21,9 +21,9 @@
 
 ## 4. E2E e entrega
 
-- [ ] 4.1 E2E Playwright `e2e/senha.spec.ts`: criar a conta via `aws.ts` → entrar → alterar a senha pelo perfil → sair → entrar com a nova senha (e recusar a antiga) → "Esqueci minha senha" mostra a mensagem neutra; verificar que o teste passa em `dev` na esteira
-- [ ] 4.2 Merge e deploy em `dev` (infra-base antes do frontend); verificar a esteira verde e o smoke test
-- [ ] 4.3 **Validação em `dev` pelo usuário:** trocar a senha pelo perfil, ver outra sessão (outro navegador) cair, recuperar a senha pela tela de login com o código do e-mail e entrar com a nova. O usuário aprova
+- [x] 4.1 E2E Playwright `e2e/senha.spec.ts`: criar a conta via `aws.ts` → entrar → alterar a senha pelo perfil → sair → entrar com a nova senha (e recusar a antiga) → "Esqueci minha senha" mostra a mensagem neutra; verificar que o teste passa em `dev` na esteira
+- [x] 4.2 Merge e deploy em `dev` (infra-base antes do frontend); verificar a esteira verde e o smoke test
+- [x] 4.3 **Validação em `dev` pelo usuário:** trocar a senha pelo perfil, ver outra sessão (outro navegador) cair, recuperar a senha pela tela de login com o código do e-mail e entrar com a nova. O usuário aprova
 
 ## Workflow follow-up
 
