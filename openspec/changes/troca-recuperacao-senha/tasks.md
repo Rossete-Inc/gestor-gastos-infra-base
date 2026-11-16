@@ -4,8 +4,8 @@
 
 ## 1. infra-base
 
-- [ ] 1.1 Revisar o texto pt-BR do e-mail de verificação/recuperação em `infra/auth.go` para servir aos dois fluxos; verificar com `go test ./...` e `cdk diff` sem outras mudanças no pool
-- [ ] 1.2 Conferir no cognito-local (`task local:up`) o suporte a `ForgotPassword`, `ConfirmForgotPassword`, `ChangePassword` e `GlobalSignOut` com chamadas `curl`, e registrar o resultado e onde ver o código em `docs/local.md`; verificar que o documento descreve os comandos usados
+- [x] 1.1 Revisar o texto pt-BR do e-mail de verificação/recuperação em `infra/auth.go` para servir aos dois fluxos; verificar com `go test ./...` e `cdk diff` sem outras mudanças no pool
+- [x] 1.2 Conferir pelo README do cognito-local (sem subir containers, por decisão do usuário de 2026-11-12) o suporte a `ForgotPassword`, `ConfirmForgotPassword`, `ChangePassword` e `GlobalSignOut`, e registrar o resultado e onde ver o código em `docs/local.md`; verificar que a tabela de diferenças cobre as quatro operações
 
 ## 2. frontend — operações e modelo
 

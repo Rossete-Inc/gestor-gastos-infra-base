@@ -82,9 +82,9 @@ aws cognito-idp initiate-auth --endpoint-url http://localhost:9229 \
 
 As credenciais `local`/`local` são fictícias. O emulador não as valida, mas o AWS CLI exige alguma.
 
-## Código de confirmação de e-mail
+## Código de confirmação e de recuperação de senha
 
-O cognito-local não envia e-mail. Ao se cadastrar pelo app, rode `task local:logs` e procure o quadro **Confirmation Code Delivery**:
+O cognito-local não envia e-mail. Ao se cadastrar ou usar "Esqueci minha senha" pelo app, rode `task local:logs` e procure o quadro **Confirmation Code Delivery**:
 
 ```
 │   Username:    novo@local.test   │
@@ -124,6 +124,8 @@ Cada repositório documenta o seu próprio comando no README, à medida que as f
 | E-mail de confirmação | Enviado pelo Cognito | Código no log (`task local:logs`) | — |
 | Validade do access token | 15 min | 15 min (o emulador respeita) | — |
 | Resposta do login | Traz `TokenType` e `ExpiresIn` | Só `AccessToken`, `IdToken` e `RefreshToken` | O front calcula a expiração pelo claim `exp` do JWT, e não por `ExpiresIn` |
+| Troca e recuperação de senha | `ChangePassword`, `ForgotPassword` e `ConfirmForgotPassword` | Suportadas (as duas últimas parcialmente, segundo o README do cognito-local); o código de recuperação aparece no log | — |
+| Encerrar outras sessões | `GlobalSignOut` revoga os refresh tokens | **Não suportado** pelo cognito-local | Com `EXPO_PUBLIC_APP_ENV=local`, o front pula o `GlobalSignOut` e registra um aviso no console; o cenário "outras sessões encerradas" só vale de verdade em `dev` |
 | Operações de admin no Cognito | Todas | Algumas não existem no emulador | Adaptador fake atrás da mesma interface (tarefa 10.1) |
 | EventBridge | Barramento real com DLQ | POST direto aos consumidores em `LOCAL_EVENT_TARGETS` | Sem retentativa nem DLQ localmente |
 | IDs do User Pool | Fixos no SSM | Mudam a cada reset | Releia `local/.env.cognito` após um reset |

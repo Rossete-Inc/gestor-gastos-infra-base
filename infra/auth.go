@@ -112,8 +112,10 @@ func NovaStackAuth(scope constructs.Construct, id string, props *AuthProps) awsc
 		AutoVerify:          &awscognito.AutoVerifiedAttrs{Email: jsii.Bool(true)},
 		UserVerification: &awscognito.UserVerificationConfig{
 			EmailStyle:   awscognito.VerificationEmailStyle_CODE,
-			EmailSubject: jsii.String("Gestor de Gastos: código de verificação"),
-			EmailBody:    jsii.String("Seu código de verificação é {####}"),
+			// O mesmo texto vale para o cadastro e para a recuperação de senha
+			// (ForgotPassword), que usa a mensagem de verificação do pool.
+			EmailSubject: jsii.String("Gestor de Gastos: seu código"),
+			EmailBody:    jsii.String("Seu código do Gestor de Gastos é {####}. Use-o para confirmar o cadastro ou redefinir a senha."),
 		},
 		StandardAttributes: &awscognito.StandardAttributes{
 			Email:    &awscognito.StandardAttribute{Required: jsii.Bool(true), Mutable: jsii.Bool(true)},
