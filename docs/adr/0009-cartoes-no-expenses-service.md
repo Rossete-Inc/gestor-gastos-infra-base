@@ -1,6 +1,6 @@
 # 0009 - Cartões de crédito no expenses-service
 
-- **Status:** Proposta
+- **Status:** Aceita (decisão do usuário em 2026-11-16)
 - **Data:** 2026-11-16
 
 ## Contexto

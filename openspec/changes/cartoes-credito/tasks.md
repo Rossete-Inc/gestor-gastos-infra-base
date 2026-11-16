@@ -4,7 +4,7 @@
 
 ## 1. infra-base
 
-- [ ] 1.1 Escrever o ADR 0009 (cartões no expenses-service, exceção ao ADR 0003, gatilho para extrair) em `docs/adr/` e referenciá-lo em `docs/plano.md` e no modelo de dados de `docs/diagramas.md`; verificar a renderização no PR
+- [x] 1.1 Escrever o ADR 0009 (cartões no expenses-service, exceção ao ADR 0003, gatilho para extrair) em `docs/adr/` e referenciá-lo em `docs/plano.md` e no modelo de dados de `docs/diagramas.md`; verificar a renderização no PR
 
 ## 2. expenses-service — domínio e armazenamento
 
