@@ -334,6 +334,8 @@ erDiagram
     USUARIO ||--o{ GASTO : "lança"
     USUARIO ||--o{ CATEGORIA : "cria personalizadas"
     CATEGORIA ||--o{ GASTO : "classifica"
+    USUARIO ||--o{ CARTAO : "cadastra"
+    CARTAO |o--o{ GASTO : "paga (fatura)"
 
     USUARIO {
         string userId PK "sub do Cognito"
@@ -354,11 +356,23 @@ erDiagram
         string gastoId PK "ULID"
         string userId FK
         string categoriaId FK
+        string cartaoId FK "opcional; obrigatório em CARTAO"
         string grupo "CARTAO ou FIXO"
         int valorCentavos
-        string data "AAAA-MM-DD"
+        string data "AAAA-MM-DD da compra"
+        string mesReferencia "AAAA-MM da fatura"
         string descricao
         boolean recorrente
+    }
+    CARTAO {
+        string cartaoId PK "ULID, no expenses-service (ADR 0009)"
+        string userId FK
+        string apelido
+        string cor
+        int diaFechamento
+        int diaVencimento
+        int limiteCentavos
+        boolean arquivado
     }
 ```
 

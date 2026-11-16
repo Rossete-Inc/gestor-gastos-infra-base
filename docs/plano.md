@@ -38,7 +38,7 @@ Cognito User Pool ──► API Gateway HTTP API (JWT authorizer)  ← único po
 |---|---|---|
 | **users-svc** | perfil, listar/ativar/bloquear usuários, alterar papel (via Cognito Admin API) | `PK=USER#id`; GSI para listagem admin |
 | **categories-svc** | categorias padrão do sistema + personalizadas do usuário. Grupo `CARTAO` (alimentação, transporte, lazer, saúde, compras, outros) e `FIXO` (aluguel, luz, água, internet, telefone, condomínio) | `PK=SYSTEM` ou `USER#id`, `SK=CAT#grupo#id` |
-| **expenses-svc** | CRUD de lançamentos; agregação mensal por grupo/categoria | `PK=USER#id`, `SK=EXP#AAAA-MM-DD#ulid`; atributos: `grupo`, `categoriaId`, `valorCentavos` (int64, nunca float), `descricao`, `data`, `recorrente` (bool, fixos) |
+| **expenses-svc** | CRUD de lançamentos; agregação mensal por grupo/categoria/cartão; cartões de crédito (ADR 0009) | Gasto: `PK=USER#id`, `SK=EXP#<mesReferencia>#<data>#ulid` (antes da change `cartoes-credito`, `EXP#AAAA-MM-DD#ulid`); atributos: `grupo`, `categoriaId`, `cartaoId`, `mesReferencia` (mês da fatura), `valorCentavos` (int64, nunca float), `descricao`, `data`, `recorrente`. Cartão: `PK=USER#id`, `SK=CARD#ulid`; atributos: `apelido`, `cor`, `diaFechamento`, `diaVencimento`, `limiteCentavos`, `arquivado` |
 
 - Agregação para gráficos: Query por usuário + prefixo do mês e soma em memória (volume pessoal é pequeno). Se crescer, materializar totais via DynamoDB Streams (registrar em ADR).
 - Gastos fixos recorrentes: MVP lança manualmente com flag `recorrente`; geração automática mensal (EventBridge Scheduler) fica para v2.
