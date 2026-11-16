@@ -4,20 +4,20 @@
 
 ## 1. infra-base
 
-- [ ] 1.1 Revisar o texto pt-BR do e-mail de verificação/recuperação em `infra/auth.go` para servir aos dois fluxos; verificar com `go test ./...` e `cdk diff` sem outras mudanças no pool
-- [ ] 1.2 Conferir no cognito-local (`task local:up`) o suporte a `ForgotPassword`, `ConfirmForgotPassword`, `ChangePassword` e `GlobalSignOut` com chamadas `curl`, e registrar o resultado e onde ver o código em `docs/local.md`; verificar que o documento descreve os comandos usados
+- [x] 1.1 Revisar o texto pt-BR do e-mail de verificação/recuperação em `infra/auth.go` para servir aos dois fluxos; verificar com `go test ./...` e `cdk diff` sem outras mudanças no pool
+- [x] 1.2 Conferir pelo README do cognito-local (sem subir containers, por decisão do usuário de 2026-11-12) o suporte a `ForgotPassword`, `ConfirmForgotPassword`, `ChangePassword` e `GlobalSignOut`, e registrar o resultado e onde ver o código em `docs/local.md`; verificar que a tabela de diferenças cobre as quatro operações
 
 ## 2. frontend — operações e modelo
 
-- [ ] 2.1 Adicionar `alterarSenha`, `sairDeTodos`, `esqueciSenha` e `redefinirSenha` em `src/features/auth/api/cognito.ts`; verificar com testes em `cognito.test.ts` que conferem o `X-Amz-Target` e o corpo de cada chamada
-- [ ] 2.2 Adicionar as operações `trocaSenha`, `esqueciSenha` e `redefinirSenha` em `model/erros.ts`, com os mapeamentos do design.md, e os schemas Zod de troca e redefinição em `model/formularios.ts` (confirmação igual e nova senha diferente da atual); verificar com `model.test.ts`
-- [ ] 2.3 Criar as mutações `useAlterarSenha`, `useEsqueciSenha` e `useRedefinirSenha` em `api/mutacoes.ts`, com a sequência de encerrar as outras sessões e relogar do design.md, e exportá-las no `index.ts`; verificar com testes MSW cobrindo o sucesso, a falha no relogin e o login silencioso que falha na recuperação
+- [x] 2.1 Adicionar `alterarSenha`, `sairDeTodos`, `esqueciSenha` e `redefinirSenha` em `src/features/auth/api/cognito.ts`; verificar com testes em `cognito.test.ts` que conferem o `X-Amz-Target` e o corpo de cada chamada
+- [x] 2.2 Adicionar as operações `trocaSenha`, `esqueciSenha` e `redefinirSenha` em `model/erros.ts`, com os mapeamentos do design.md, e os schemas Zod de troca e redefinição em `model/formularios.ts` (confirmação igual e nova senha diferente da atual); verificar com `model.test.ts`
+- [x] 2.3 Criar as mutações `useAlterarSenha`, `useEsqueciSenha` e `useRedefinirSenha` em `api/mutacoes.ts`, com a sequência de encerrar as outras sessões e relogar do design.md, e exportá-las no `index.ts`; verificar com testes MSW cobrindo o sucesso, a falha no relogin e o login silencioso que falha na recuperação
 
 ## 3. frontend — telas
 
-- [ ] 3.1 Criar `(auth)/esqueci-senha.tsx` e `(auth)/redefinir-senha.tsx` com os formulários, o reenvio do código e a mensagem neutra, e adicionar em `LoginForm.tsx` o link "Esqueci minha senha" e o aviso `senhaRedefinida`; verificar com testes de componente cobrindo os cenários da spec "Recuperação de senha"
-- [ ] 3.2 Criar `(app)/alterar-senha.tsx` e o `MenuItem` "Alterar senha" no `PerfilView.tsx`, ajustando o mock de `@/features/auth` em `PerfilView.test.tsx`; verificar com testes cobrindo os cenários da spec "Alteração de senha"
-- [ ] 3.3 Rodar `npm run verify` (typecheck, lint, format, boundaries e Jest) sem erros
+- [x] 3.1 Criar `(auth)/esqueci-senha.tsx` e `(auth)/redefinir-senha.tsx` com os formulários, o reenvio do código e a mensagem neutra, e adicionar em `LoginForm.tsx` o link "Esqueci minha senha" e o aviso `senhaRedefinida`; verificar com testes de componente cobrindo os cenários da spec "Recuperação de senha"
+- [x] 3.2 Criar `(app)/alterar-senha.tsx` e o `MenuItem` "Alterar senha" no `PerfilView.tsx`, ajustando o mock de `@/features/auth` em `PerfilView.test.tsx`; verificar com testes cobrindo os cenários da spec "Alteração de senha"
+- [x] 3.3 Rodar `npm run verify` (typecheck, lint, format, boundaries e Jest) sem erros
 
 ## 4. E2E e entrega
 
