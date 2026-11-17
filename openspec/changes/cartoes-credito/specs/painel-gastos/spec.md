@@ -50,12 +50,27 @@ O painel SHALL exibir o detalhe de uma fatia do gráfico de pizza quando o usuá
 
 #### Scenario: Passar o mouse numa categoria
 - **WHEN** no navegador o usuário passa o mouse sobre a fatia Alimentação, que soma R$ 420,00 (R$ 300,00 no "Nubank" e R$ 120,00 no "Inter") e representa 35% do mês
-- **THEN** o painel mostra "Alimentação · Cartão · R$ 420,00 · 35%" e as linhas "Nubank R$ 300,00" e "Inter R$ 120,00"
+- **THEN** a fatia Alimentação salta para fora do anel, as outras ficam esmaecidas e um balão sai dela com "Alimentação · Cartão · R$ 420,00 · 35%" e as linhas "Nubank R$ 300,00" e "Inter R$ 120,00"
 
 #### Scenario: Tocar numa fatia no celular
 - **WHEN** no celular o usuário toca na fatia Aluguel
-- **THEN** o painel mostra o detalhe da fatia Aluguel, e um novo toque fora do gráfico o fecha
+- **THEN** o balão com o detalhe sai da fatia Aluguel, que fica em destaque, e um novo toque fora do gráfico o fecha
 
 #### Scenario: Visão por cartão
 - **WHEN** a pizza está na visão por cartão e o usuário seleciona a fatia "Nubank"
 - **THEN** o detalhe mostra o nome do cartão, o valor e o percentual da fatura do mês, e a divisão entre os grupos `CARTAO` e `FIXO`
+
+### Requirement: Balão e destaque da fatia selecionada
+O detalhe da fatia SHALL aparecer num balão que sai da borda da fatia selecionada, com uma seta apontando para ela, sem sair da largura do card. A fatia selecionada SHALL saltar para fora do anel e as demais SHALL ficar esmaecidas até a seleção acabar.
+
+#### Scenario: Fatia na metade de cima
+- **WHEN** o usuário seleciona uma fatia na metade de cima do gráfico
+- **THEN** o balão aparece acima da fatia, com a seta apontando para baixo, e as outras fatias ficam esmaecidas
+
+#### Scenario: Fatia perto da borda da tela
+- **WHEN** no celular o usuário seleciona uma fatia do lado direito do gráfico
+- **THEN** o balão fica inteiro dentro do card, e a seta continua apontando para a fatia
+
+#### Scenario: Fim da seleção
+- **WHEN** o usuário toca fora do gráfico ou, no navegador, tira o mouse dele
+- **THEN** o balão some e todas as fatias voltam ao tamanho e à cor normais
