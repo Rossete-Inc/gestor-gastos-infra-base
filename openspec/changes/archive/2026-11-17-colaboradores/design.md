@@ -93,11 +93,14 @@ Nas telas existentes:
 - `Gasto` ganha `lancadoPor{id, nome}` e `editadoPor`;
 - `/telas/gastos` ganha `autorId` e a lista de pessoas da conta, para montar o filtro;
 - `/me` passa a trazer `contas` e `convitesPendentes`, para o aviso no painel.
+  - Decisão de implementação (2026-11-17): o `/me` continua só com o perfil. As contas e os convites vêm de `GET /contas`, que o seletor e o aviso de convites já consultam; assim o `/me` não depende do users-service para a colaboração.
 
 ### Frontend
 
 - **Conta ativa.** Fica num store Zustand (`features/colaboracao/model/contaAtiva.ts`), persistido no armazenamento local. O mutator `shared/api/http.ts` lê a conta por um provedor configurável, no mesmo padrão de `configurarAutenticacao`, e envia o `X-Conta`.
+  - Decisão de implementação (2026-11-17): sem Zustand, que o projeto não usa. É um store com assinantes, como o da sessão, lido por `useSyncExternalStore` e persistido por `shared/platform/preferencias`.
 - **Troca de conta.** Faz `queryClient.clear()` e leva ao painel. Um 404 `conta_nao_encontrada` volta para a própria conta e mostra um aviso.
+  - Decisão de implementação (2026-11-17): usa `resetQueries()`, que recarrega as telas abertas em vez de deixá-las vazias. Como a tela que pediu a troca pode desmontar (vira "Carregando"), a navegação depois de aceitar convite ou sair da conta fica no `onSuccess` do hook, e não no `mutate`, cujos callbacks o TanStack Query descarta ao desmontar (frontend #32).
 - **Telas:**
   - seletor no `Header`, que só aparece se houver mais de uma conta;
   - Perfil → "Colaboradores", para o dono;
