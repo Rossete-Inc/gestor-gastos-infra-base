@@ -42,7 +42,8 @@ O `CriarParcelamento` calcula todas as parcelas e grava a série junto com as N 
 - A data de cada parcela é a data da compra somada de k meses, com o dia limitado ao último dia do mês. O `mesReferencia` sai de `MesDaFatura`, de modo que parcelas consecutivas caem em faturas consecutivas.
 - **Modo pela parcela.** As parcelas vão de `parcelaAtual` a N, a partir da data informada. O mês final, quando informado, define N.
 - **Divisão pelo total.** O valor de cada parcela é `total / N`, e a 1ª parcela recebe também o resto `total % N`. A conta é toda em centavos `int64`.
-- **Idempotência.** O BFF repassa o cabeçalho `Idempotency-Key` gerado pelo front. O ID da série é derivado dessa chave, e a transação usa `attribute_not_exists`. Um reenvio, portanto, não duplica a série.
+- **Idempotência.** O front gera uma chave por formulário e a envia no corpo do lançamento, em `chaveIdempotencia`; o BFF a repassa. O ID da série é derivado dessa chave, e a transação usa `attribute_not_exists`. Um reenvio, portanto, não duplica a série: o serviço devolve o gasto do primeiro envio.
+  - Decisão de implementação (2026-11-17): a chave vai no corpo, e não no cabeçalho `Idempotency-Key`, porque o CORS da HTTP API só libera `Authorization` e `Content-Type`; liberar um cabeçalho novo pediria um `cdk deploy` manual da stack da API.
 
 ### Recorrência criada na leitura, sem agendador
 Ao ler um mês M (`ListarGastos`, `ResumoMensal` e `ResumoCartoes`), o serviço segue estes passos:
@@ -94,7 +95,7 @@ A troca em relação ao design do MVP fica registrada aqui. Não precisa de ADR,
   - Modo **Recorrente:** mês final opcional.
 - **Alcance:** diálogo `EscopoSerieDialog` ao salvar ou excluir um item de série.
 - **Lista:** selo "3/10" ou "recorrente" no `ExpenseItem`.
-- **Idempotência:** `Idempotency-Key` gerada por envio do formulário.
+- **Idempotência:** `chaveIdempotencia` gerada uma vez por formulário, no corpo do lançamento.
 
 ## Risks / Trade-offs
 

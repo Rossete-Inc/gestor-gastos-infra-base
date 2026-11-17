@@ -18,11 +18,13 @@ var tabelas = []struct {
 	gsis []string // nome de cada GSI; as chaves são <nome>PK e <nome>SK
 }{
 	// users-service: PK=USER#<id>, SK=PROFILE; GSI1 lista todos para o admin
-	// (GSI1PK=USERS, GSI1SK=<criadoEm>#<id>).
-	{nome: "gestor-gastos-users", gsis: []string{"GSI1"}},
+	// (GSI1PK=USERS, GSI1SK=<criadoEm>#<id>); GSI2 dos colaboradores
+	// (GSI2PK=MEMBRO#<id> ou EMAIL#<email>, GSI2SK=CONTA#<donoId>).
+	{nome: "gestor-gastos-users", gsis: []string{"GSI1", "GSI2"}},
 	// categories-service: PK=SYSTEM|USER#<id>, SK=CAT#<grupo>#<id>.
 	{nome: "gestor-gastos-categories"},
-	// expenses-service: PK=USER#<id>, SK=EXP#<AAAA-MM-DD>#<ulid>.
+	// expenses-service: PK=USER#<id>, SK=EXP#<mesRef>#<AAAA-MM-DD>#<ulid>,
+	// CARD#<ulid> e SERIE#<ulid>.
 	{nome: "gestor-gastos-expenses"},
 }
 

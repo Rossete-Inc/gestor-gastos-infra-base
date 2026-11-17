@@ -1,6 +1,6 @@
 # 0010 - Conta compartilhada resolvida no BFF
 
-- **Status:** Proposta
+- **Status:** Aceita (2026-11-17)
 - **Data:** 2026-11-16
 
 ## Contexto

@@ -4,7 +4,7 @@
 
 ## 1. infra-base
 
-- [ ] 1.1 Aceitar o ADR 0010 (conta compartilhada resolvida no BFF) e atualizar `docs/plano.md` (users-svc: itens `CONTA#`, GSI2) e `docs/diagramas.md` (sequência do acesso a conta alheia e modelo de dados); verificar a renderização no PR
+- [x] 1.1 Aceitar o ADR 0010 (conta compartilhada resolvida no BFF) e atualizar `docs/plano.md` (users-svc: itens `CONTA#`, GSI2) e `docs/diagramas.md` (sequência do acesso a conta alheia e modelo de dados) e liberar o cabeçalho `X-Conta` no CORS da HTTP API (`infra/api.go`, com `cdk deploy` manual da stack da API); verificar a renderização no PR e os testes do CDK
 
 ## 2. users-service
 

@@ -7,12 +7,10 @@ Permite registrar, corrigir, remover e consultar os gastos de cartão e fixos do
 ## Requirements
 
 ### Requirement: Lançar gasto
-O sistema SHALL permitir que o usuário registre um gasto com valor, data, categoria, descrição opcional e cartão.
-- O grupo do gasto MUST ser o grupo da categoria escolhida.
-- Gasto de categoria do grupo `CARTAO` MUST informar um cartão ativo do usuário.
-- Gasto de categoria do grupo `FIXO` MAY informar um cartão.
-- O gasto com cartão MUST receber o mês de referência da fatura do cartão.
-- O gasto sem cartão MUST receber como mês de referência o mês da data.
+O sistema SHALL permitir registrar um gasto com valor, data, categoria, descrição opcional e cartão, à vista, parcelado ou recorrente.
+- O grupo MUST ser o da categoria.
+- Categoria `CARTAO` MUST informar um cartão ativo; `FIXO` MAY informar.
+- O mês de referência MUST ser o da fatura do cartão, ou o da data sem cartão.
 
 #### Scenario: Gasto de cartão
 - **WHEN** o usuário lança R$ 45,90 em 2026-11-03 na categoria Alimentação, com descrição "Almoço", no cartão "Nubank", que fecha dia 25 e vence dia 5
@@ -31,8 +29,16 @@ O sistema SHALL permitir que o usuário registre um gasto com valor, data, categ
 - **THEN** o gasto é salvo no grupo `FIXO`, vinculado ao "Nubank", e aparece na lista de dezembro de 2026
 
 #### Scenario: Gasto fixo recorrente
-- **WHEN** o usuário lança R$ 1.500,00 na categoria Aluguel marcado como recorrente
-- **THEN** o gasto é salvo no grupo `FIXO`, sinalizado como recorrente
+- **WHEN** o usuário lança R$ 1.500,00 em 2026-11-05 na categoria Aluguel marcado como recorrente
+- **THEN** o gasto é salvo no grupo `FIXO` e se repete nos meses seguintes, conforme a capability `parcelamentos-recorrencias`
+
+#### Scenario: Gasto parcelado
+- **WHEN** o usuário lança uma compra de R$ 1.200,00 em 3 parcelas no cartão "Nubank"
+- **THEN** são criados 3 gastos de R$ 400,00 em faturas consecutivas, conforme a capability `parcelamentos-recorrencias`
+
+#### Scenario: Recorrente antigo
+- **WHEN** existe um gasto lançado antes desta mudança com o flag recorrente
+- **THEN** ele continua exibido como recorrente e não gera ocorrências em outros meses
 
 ### Requirement: Validação do lançamento
 O sistema MUST recusar lançamentos com:
@@ -63,7 +69,7 @@ Valores monetários MUST ser armazenados e somados sem perda de precisão, em ce
 - **THEN** o total do mês exibido é exatamente R$ 0,30
 
 ### Requirement: Editar gasto
-O sistema SHALL permitir que o usuário altere o valor, a data, a categoria, a descrição, o cartão e a recorrência de um gasto próprio, com as mesmas validações do lançamento. O mês de referência MUST ser recalculado com os dados atuais do cartão. Um gasto sem cartão de categoria `CARTAO`, lançado antes da existência de cartões, MUST poder ser editado para receber um cartão.
+O sistema SHALL permitir que o usuário altere o valor, a data, a categoria, a descrição e o cartão de um gasto próprio, com as mesmas validações do lançamento. O mês de referência MUST ser recalculado com os dados atuais do cartão. Um gasto antigo de categoria `CARTAO` sem cartão MUST poder ser editado para receber um cartão. Ao editar um gasto de parcelamento ou de recorrência, o usuário MUST escolher o alcance da alteração.
 
 #### Scenario: Troca de categoria entre grupos
 - **WHEN** o usuário altera um gasto de Alimentação para Internet
@@ -77,12 +83,20 @@ O sistema SHALL permitir que o usuário altere o valor, a data, a categoria, a d
 - **WHEN** o usuário troca o cartão de um gasto para outro com fechamento diferente
 - **THEN** o mês de referência é recalculado pelo novo cartão
 
+#### Scenario: Editar item de série
+- **WHEN** o usuário edita uma parcela ou ocorrência recorrente
+- **THEN** o app pede o alcance "só esta", "esta e as próximas" ou "todas" antes de salvar
+
 ### Requirement: Excluir gasto
-O sistema SHALL permitir que o usuário exclua um gasto próprio, após confirmação no app.
+O sistema SHALL permitir que o usuário exclua um gasto próprio, após confirmação no app. Ao excluir um gasto de parcelamento ou de recorrência, o usuário MUST escolher o alcance da exclusão.
 
 #### Scenario: Exclusão confirmada
-- **WHEN** o usuário confirma a exclusão de um gasto
+- **WHEN** o usuário confirma a exclusão de um gasto à vista
 - **THEN** o gasto deixa de aparecer na lista e nos totais
+
+#### Scenario: Excluir item de série
+- **WHEN** o usuário exclui uma parcela ou ocorrência recorrente
+- **THEN** o app pede o alcance "só esta", "esta e as próximas" ou "todas", e exclui conforme a escolha
 
 ### Requirement: Isolamento de dados por usuário
 Toda leitura e escrita de gastos MUST ser restrita ao usuário autenticado, independentemente de identificadores enviados na requisição.

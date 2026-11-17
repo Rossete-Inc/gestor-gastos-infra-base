@@ -96,7 +96,8 @@ func NovaStackApi(scope constructs.Construct, id string, props *ApiProps) awscdk
 				awsapigatewayv2.CorsHttpMethod_DELETE,
 				awsapigatewayv2.CorsHttpMethod_OPTIONS,
 			},
-			AllowHeaders: jsii.Strings("Authorization", "Content-Type"),
+			// X-Conta: conta ativa do colaborador (ADR 0010).
+			AllowHeaders: jsii.Strings("Authorization", "Content-Type", "X-Conta"),
 			MaxAge:       awscdk.Duration_Hours(jsii.Number(1)),
 		},
 	})

@@ -274,6 +274,41 @@ sequenceDiagram
     Note over B,CS: Falhas vão para DLQ e são reprocessadas
 ```
 
+## 8a. Acesso a conta alheia (colaboradores, ADR 0010)
+
+O colaborador escolhe a conta no app, que manda `X-Conta` em toda requisição. O BFF confere o acesso no users-service (com cache de 10 s) e chama os serviços de dados com o `userId` do dono; o autor real vai só nos gastos.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as App (colaborador)
+    participant F as BFF
+    participant US as users-service
+    participant ES as expenses-service
+
+    A->>F: POST /gastos (Authorization, X-Conta: donoId)
+    F->>F: Valida o JWT (sub = colaborador)
+    alt X-Conta é a própria conta
+        F->>F: Conta = sub, papel DONO
+    else conta de outra pessoa
+        F->>US: ObterAcesso(donoId, sub)
+        alt não é membro
+            US-->>F: sem acesso
+            F-->>A: 404 conta_nao_encontrada
+        else membro
+            US-->>F: papel EDITOR ou LEITOR
+        end
+    end
+    alt LEITOR numa escrita
+        F-->>A: 403 somente_leitura
+    else DONO ou EDITOR
+        F->>ES: CriarGasto (userId = donoId, autorId = sub)
+        ES-->>F: Gasto com criadoPor
+        F->>US: NomesDe([criadoPor])
+        F-->>A: 201 Gasto com lancadoPor
+    end
+```
+
 ## 9. Ciclo de vida do usuário
 
 ```mermaid
@@ -336,6 +371,10 @@ erDiagram
     CATEGORIA ||--o{ GASTO : "classifica"
     USUARIO ||--o{ CARTAO : "cadastra"
     CARTAO |o--o{ GASTO : "paga (fatura)"
+    SERIE |o--o{ GASTO : "parcela ou ocorrência"
+    USUARIO ||--o{ MEMBRO : "dono da conta"
+    USUARIO ||--o{ MEMBRO : "colabora como"
+    USUARIO ||--o{ CONVITE : "convida"
 
     USUARIO {
         string userId PK "sub do Cognito"
@@ -363,6 +402,8 @@ erDiagram
         string mesReferencia "AAAA-MM da fatura"
         string descricao
         boolean recorrente
+        string serieId FK "opcional"
+        string criadoPor "autor (colaboradores)"
     }
     CARTAO {
         string cartaoId PK "ULID, no expenses-service (ADR 0009)"
@@ -373,6 +414,28 @@ erDiagram
         int diaVencimento
         int limiteCentavos
         boolean arquivado
+    }
+    SERIE {
+        string serieId PK "ULID, no expenses-service"
+        string userId FK
+        string tipo "PARCELAMENTO ou RECORRENCIA"
+        int valorCentavos
+        int dia
+        string mesInicial
+        string mesFinal "opcional na recorrência"
+        int totalParcelas
+    }
+    MEMBRO {
+        string donoId FK "conta (users-service)"
+        string userId FK "colaborador"
+        string papel "EDITOR ou LEITOR"
+        string desde
+    }
+    CONVITE {
+        string donoId FK
+        string email "normalizado"
+        string papel "EDITOR ou LEITOR"
+        string criadoEm
     }
 ```
 
