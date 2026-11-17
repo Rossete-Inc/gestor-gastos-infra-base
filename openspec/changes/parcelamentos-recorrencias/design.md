@@ -46,14 +46,16 @@ O `CriarParcelamento` calcula todas as parcelas e grava a série junto com as N 
 
 ### Recorrência criada na leitura, sem agendador
 Ao ler um mês M (`ListarGastos`, `ResumoMensal` e `ResumoCartoes`), o serviço segue estes passos:
-1. Lê as séries `RECORRENCIA` ativas do usuário, com uma Query em `begins_with(SK, "SERIE#")`. O volume é pequeno.
-2. Para cada série com `mesInicial <= M <= mesFinal` (ou sem mês final), monta a ocorrência esperada de M.
-3. Grava com `PutItem` condicional (`attribute_not_exists`), numa SK determinística: `EXP#<mesRef>#<data>#S<serieId>-<M>`.
-   - Uma leitura repetida ou concorrente não duplica a ocorrência.
-   - Uma ocorrência excluída com "só esta" vira um item com `excluido=true`, ignorado nas somas e na lista, para não reaparecer.
+1. Lê as séries do usuário, com uma Query em `begins_with(SK, "SERIE#")`. O volume é pequeno.
+2. Para cada recorrência, calcula os meses de `mesInicial` até M (ou até `mesFinal`) que ainda não estão em `mesesGerados`, o conjunto dos meses em que a série já criou a ocorrência. Os meses da série são os da data dos gastos; o mês de referência de cada ocorrência sai da fatura do cartão.
+3. Grava as ocorrências que faltam numa transação que também faz `ADD mesesGerados` na série, condicionada a nenhum desses meses já estar no conjunto.
+   - Uma leitura repetida ou concorrente não duplica: a segunda transação falha na condição e é ignorada.
+   - Uma ocorrência excluída com "só esta" continua com o mês em `mesesGerados` e não reaparece, sem precisar de marcador no gasto.
 4. Só então executa a Query do mês.
 
-No `ResumoCartoes`, que olha meses futuros, as recorrências são criadas apenas até o mês corrente. As ocorrências de meses futuros que já existam porque o usuário as visitou são ignoradas no limite, conforme a spec.
+Na listagem, a criação acontece na primeira página. No `ResumoCartoes`, as recorrências são criadas até o maior entre o mês pedido e o mês corrente, para a fatura exibida ficar completa. No limite usado, as ocorrências com data depois do mês corrente são ignoradas, conforme a spec.
+
+Decisão de implementação (2026-11-17): o conjunto `mesesGerados` na série substituiu a SK determinística e o marcador `excluido` previstos antes. Ele resolve também a ocorrência que "só esta" moveu de data: com a SK determinística, a leitura seguinte não acharia a ocorrência na chave esperada e a criaria de novo.
 
 Alternativas descartadas:
 - **EventBridge Scheduler mensal:** varreria todos os usuários e exigiria uma Lambda de job e um índice de séries por usuário ativo. Além disso, o mês só ficaria completo depois de o job rodar, o que falha ao navegar para um mês futuro.
@@ -64,18 +66,22 @@ A troca em relação ao design do MVP fica registrada aqui. Não precisa de ADR,
 ### Alcance da edição e da exclusão
 `AtualizarGasto` e `ExcluirGasto` ganham o parâmetro `escopo` (`ESTA`, `PROXIMAS` ou `TODAS`), obrigatório quando o gasto tem `serieId`.
 
-- **`ESTA`:** altera só o item e marca `ajustado=true`. Na exclusão de uma ocorrência recorrente, grava o marcador `excluido=true`.
+- **`ESTA`:** altera só o item e marca `ajustado=true`. Na exclusão, apaga só o item; numa recorrência o mês continua em `mesesGerados`, e a ocorrência não volta.
 - **`PROXIMAS` numa recorrência:** encerra a série original com `mesFinal = M-1` e cria uma nova série a partir de M com os dados novos. As ocorrências já gravadas de M em diante que não estejam `ajustado` são reescritas (edição) ou apagadas (exclusão).
 - **`PROXIMAS` num parcelamento:** reescreve ou apaga as parcelas de `numero >= n` que não estejam ajustadas.
 - **`TODAS`:** atualiza a série e todos os itens não ajustados. Na exclusão, apaga a série e todos os itens.
-- **Mudança de data, cartão ou categoria com `PROXIMAS` ou `TODAS`:** recalcula a data e o `mesReferencia` de cada item afetado. Como a SK muda, cada item é apagado e regravado.
+- **Mudança de data, cartão ou categoria com `PROXIMAS` ou `TODAS`:** recalcula a data e o `mesReferencia` de cada item afetado. Como a SK muda, cada item é apagado e regravado. Nesses alcances só o **dia** da data vale para a série: mudar o mês responde 422 no campo `data`, com a orientação de alterar "só esta".
+- **Valor em `PROXIMAS` ou `TODAS`:** se o valor não mudou, cada item mantém o seu; assim a 1ª parcela continua com o resto da divisão.
+- **Concorrência:** a série tem `versao`, incrementada a cada gravação (inclusive pela criação de ocorrências). A edição grava a série só sobre a versão lida; se outra operação mudou no meio, o serviço refaz a operação uma vez.
 - **Transações.** As operações rodam em `TransactWriteItems`, em lotes de até 100 itens. Uma recorrência com muitas ocorrências futuras visitadas é rara, e acima de 100 itens a operação segue em lotes idempotentes.
 
 ### Contrato e BFF
-- **`GastoIn`** ganha `parcelamento{modo: TOTAL|PARCELA, totalCentavos?, parcelaCentavos?, parcelas?, parcelaAtual?, mesFinal?}` e `recorrencia{mesFinal?}`, mutuamente exclusivos.
+- **`GastoIn`** ganha `parcelamento{modo: TOTAL|PARCELA, parcelas?, parcelaAtual?, mesFinal?}` e `recorrencia{mesFinal?}`, mutuamente exclusivos.
+  - O `valorCentavos` do gasto é o total no modo `TOTAL` e o valor da parcela no modo `PARCELA`, sem campos de valor à parte.
+  - No modo `PARCELA`, o `mesFinal` é o mês de referência da última parcela; na recorrência, o mês da data da última ocorrência.
   - O campo `recorrente` (booleano) continua só na saída, para os gastos antigos.
   - O switch do front passa a enviar `recorrencia`.
-- **`Gasto`** ganha `serie{id, tipo, numero, total?}`, para exibir "3/10" ou "recorrente".
+- **`Gasto`** ganha `serie{id, tipo, numero, total?, ajustado?}`, para exibir "3/10" ou "recorrente".
 - **Rotas:** `PUT /gastos/{id}?escopo=` e `DELETE /gastos/{id}?escopo=`. Sem escopo num item de série, a resposta é 422.
 - **Validações no BFF:** de 2 a 72 parcelas; `parcelaAtual <= parcelas`; o mês final não pode ser anterior ao mês de referência da compra.
 - **Mês corrente:** calculado em America/Sao_Paulo, como em `cartoes-credito`.
