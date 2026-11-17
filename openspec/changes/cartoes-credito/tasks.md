@@ -26,7 +26,7 @@
 - [ ] 4.1 Copiar o contrato fixado para `openapi/bff.yaml` e rodar `npm run api:gerar`; criar `shared/lib/fatura.ts` com os mesmos casos de tabela do Go; verificar com Jest
 - [ ] 4.2 Criar a feature `cartoes` (lista com fatura, limite usado e disponível; formulário; detalhe com `MonthSelector`; arquivar, reativar e excluir com confirmação; estado vazio) e a aba "Cartões" em `(tabs)/_layout.tsx` e `TabBar.tsx`; verificar com testes MSW cobrindo os cenários da spec `cartoes-credito`
 - [ ] 4.3 `GastoForm`: seletor de cartão obrigatório para CARTAO e opcional para FIXO, e o texto "Entra na fatura de …"; `GastosView`: filtro de cartão, incluindo "Sem cartão", e o apelido do cartão no item; `PainelView`: bloco "Por cartão" e a pizza "Cartões"; verificar com testes MSW e com `npm run verify`
-- [ ] 4.3a Detalhe da fatia: `PieChart` com seleção por toque e hover (web) e um cartão de detalhe no `PainelView` (nome, grupo, valor, % e divisão por cartão ou grupo); verificar com testes cobrindo os cenários da spec "Detalhe da fatia do gráfico"
+- [ ] 4.3a Detalhe da fatia: `PieChart` com seleção por toque e hover (web) e o detalhe (nome, grupo, valor, % e divisão por cartão ou grupo) num balão que sai da fatia, com a fatia saltando e as outras esmaecidas; verificar com testes cobrindo os cenários de "Detalhe da fatia do gráfico" e "Balão e destaque da fatia selecionada"
 - [ ] 4.4 E2E `e2e/cartoes.spec.ts`: cadastrar cartão (fechamento 25, vencimento 5) → lançar compra no dia 28 do mês corrente → vê-la na fatura do mês+2 na aba Cartões e no painel → excluir o cartão é recusado → arquivar; verificar que passa em `dev` na esteira
 - [ ] 4.5 Fazer o merge e o deploy em `dev`; verificar a esteira verde
 
