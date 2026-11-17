@@ -495,7 +495,7 @@ func TestApiCorsLiberaLocalhostEOSiteDoSsmPorPadrao(t *testing.T) {
 		"ProtocolType": "HTTP",
 		"CorsConfiguration": map[string]interface{}{
 			"AllowOrigins": []interface{}{"http://localhost:8081", map[string]interface{}{"Ref": site}},
-			"AllowHeaders": []interface{}{"Authorization", "Content-Type"},
+			"AllowHeaders": []interface{}{"Authorization", "Content-Type", "X-Conta"},
 			"AllowMethods": []interface{}{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 			"MaxAge":       3600,
 		},
