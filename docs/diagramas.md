@@ -309,6 +309,42 @@ sequenceDiagram
     end
 ```
 
+## 8b. Alerta de meta e Web Push (ADR 0011)
+
+Ao gravar um gasto, o expenses-service confere as metas dos meses afetados. Cada limiar (80% ou 100%) é marcado uma vez por mês, com update condicional, e cada escrita gera no máximo um evento.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as App
+    participant F as BFF
+    participant ES as expenses-service
+    participant B as EventBridge
+    participant US as users-service
+    participant P as Serviço de push do navegador
+    participant SW as Service worker (aparelhos)
+
+    A->>F: POST /gastos
+    F->>ES: Lancar (userId = donoId)
+    ES->>ES: Grava o gasto e soma a categoria nos meses afetados
+    opt meta cruzou 80% ou 100% pela primeira vez no mês
+        ES->>ES: Marca o limiar (update condicional)
+        ES->>B: PutEvents MetasAtingidas (um por escrita)
+    end
+    ES-->>F: Gasto + alertasDeMeta
+    F-->>A: 201 (o app mostra o aviso)
+    B->>US: MetasAtingidas
+    US->>US: Destinatários = dono + colaboradores; lê PUSH# de cada um
+    US->>P: Web Push assinado com VAPID
+    alt assinatura válida
+        P->>SW: push
+        SW->>SW: showNotification; toque abre /painel
+    else 404 ou 410
+        P-->>US: assinatura expirada
+        US->>US: Apaga a assinatura
+    end
+```
+
 ## 9. Ciclo de vida do usuário
 
 ```mermaid
@@ -375,6 +411,8 @@ erDiagram
     USUARIO ||--o{ MEMBRO : "dono da conta"
     USUARIO ||--o{ MEMBRO : "colabora como"
     USUARIO ||--o{ CONVITE : "convida"
+    CATEGORIA ||--o| META : "tem teto mensal"
+    USUARIO ||--o{ ASSINATURA_PUSH : "ativa no aparelho"
 
     USUARIO {
         string userId PK "sub do Cognito"
@@ -435,6 +473,22 @@ erDiagram
         string donoId FK
         string email "normalizado"
         string papel "EDITOR ou LEITOR"
+        string criadoEm
+    }
+    META {
+        string categoriaId PK "uma por categoria, no expenses-service (ADR 0011)"
+        string userId FK "dono da conta"
+        string nomeCategoria
+        string grupo "CARTAO ou FIXO"
+        list vigencias "desde AAAA-MM e valorCentavos ou null"
+        map alertas "mes para limiares já notificados"
+    }
+    ASSINATURA_PUSH {
+        string endpointHash PK "sha256 do endpoint, no users-service"
+        string userId FK
+        string endpoint
+        string p256dh
+        string auth
         string criadoEm
     }
 ```
