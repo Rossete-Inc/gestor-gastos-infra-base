@@ -24,7 +24,8 @@ Cognito User Pool ──► API Gateway HTTP API (JWT authorizer)  ← único po
                ▼             ▼              ▼
         users-svc     categories-svc   expenses-svc   (Lambdas Go)
         DDB users     DDB categories   DDB expenses
-               └──── EventBridge (ex.: UserDeleted → expenses-svc limpa dados)
+               └──── EventBridge (ex.: UserDeleted → expenses-svc limpa dados;
+                                  MetasAtingidas → users-svc envia Web Push, ADR 0011)
 ```
 
 - **API Gateway HTTP API** (≈70% mais barato que REST API) com authorizer JWT do Cognito. Só o BFF fica exposto; microserviços são invocados diretamente (`lambda:InvokeFunction`), sem API própria — mais barato e sem superfície pública. Trade-off: acoplamento ao transporte Lambda; isolar num client interno para trocar por HTTP depois se preciso.
@@ -36,11 +37,13 @@ Cognito User Pool ──► API Gateway HTTP API (JWT authorizer)  ← único po
 
 | Serviço | Responsabilidade | Chaves |
 |---|---|---|
-| **users-svc** | perfil, listar/ativar/bloquear usuários, alterar papel (via Cognito Admin API); colaboradores da conta (ADR 0010) | `PK=USER#id`; GSI1 para listagem admin. Colaboração: membro `PK=CONTA#donoId`, `SK=MEMBRO#userId` (`papel` EDITOR ou LEITOR, `nome`, `desde`) e convite `SK=CONVITE#email` (`papel`, `criadoEm`, `nomeDono`); GSI2 (`GSI2PK=MEMBRO#userId` ou `EMAIL#email`, `GSI2SK=CONTA#donoId`) responde "de quais contas participo" e "quais convites recebi" |
+| **users-svc** | perfil, listar/ativar/bloquear usuários, alterar papel (via Cognito Admin API); colaboradores da conta (ADR 0010) | `PK=USER#id`; GSI1 para listagem admin. Colaboração: membro `PK=CONTA#donoId`, `SK=MEMBRO#userId` (`papel` EDITOR ou LEITOR, `nome`, `desde`) e convite `SK=CONVITE#email` (`papel`, `criadoEm`, `nomeDono`); GSI2 (`GSI2PK=MEMBRO#userId` ou `EMAIL#email`, `GSI2SK=CONTA#donoId`) responde "de quais contas participo" e "quais convites recebi". Assinatura Web Push (ADR 0011): `PK=USER#id`, `SK=PUSH#<sha256(endpoint)>` (`endpoint`, `p256dh`, `auth`, `criadoEm`) |
 | **categories-svc** | categorias padrão do sistema + personalizadas do usuário. Grupo `CARTAO` (alimentação, transporte, lazer, saúde, compras, outros) e `FIXO` (aluguel, luz, água, internet, telefone, condomínio) | `PK=SYSTEM` ou `USER#id`, `SK=CAT#grupo#id` |
-| **expenses-svc** | CRUD de lançamentos; agregação mensal por grupo/categoria/cartão; cartões de crédito (ADR 0009) | Gasto: `PK=USER#id`, `SK=EXP#<mesReferencia>#<data>#ulid` (antes da change `cartoes-credito`, `EXP#AAAA-MM-DD#ulid`); atributos: `grupo`, `categoriaId`, `cartaoId`, `mesReferencia` (mês da fatura), `valorCentavos` (int64, nunca float), `descricao`, `data`, `recorrente`. Cartão: `PK=USER#id`, `SK=CARD#ulid`; atributos: `apelido`, `cor`, `diaFechamento`, `diaVencimento`, `limiteCentavos`, `arquivado`. Série (parcelamento ou recorrência): `PK=USER#id`, `SK=SERIE#ulid`; os gastos da série levam `serieId`, `numero` e `ajustado`. Autoria (colaboradores): `criadoPor` e `atualizadoPor` no gasto |
+| **expenses-svc** | CRUD de lançamentos; agregação mensal por grupo/categoria/cartão; cartões de crédito (ADR 0009) | Gasto: `PK=USER#id`, `SK=EXP#<mesReferencia>#<data>#ulid` (antes da change `cartoes-credito`, `EXP#AAAA-MM-DD#ulid`); atributos: `grupo`, `categoriaId`, `cartaoId`, `mesReferencia` (mês da fatura), `valorCentavos` (int64, nunca float), `descricao`, `data`, `recorrente`. Cartão: `PK=USER#id`, `SK=CARD#ulid`; atributos: `apelido`, `cor`, `diaFechamento`, `diaVencimento`, `limiteCentavos`, `arquivado`. Série (parcelamento ou recorrência): `PK=USER#id`, `SK=SERIE#ulid`; os gastos da série levam `serieId`, `numero` e `ajustado`. Autoria (colaboradores): `criadoPor` e `atualizadoPor` no gasto. Meta (ADR 0011): `PK=USER#id`, `SK=META#<categoriaId>`; atributos: `nomeCategoria`, `grupo`, `vigencias` (lista de `{desde: AAAA-MM, valorCentavos ou null}`), `alertas` (mapa `mes → [80, 100]` já notificados) |
 
 - Agregação para gráficos: Query por usuário + prefixo do mês e soma em memória (volume pessoal é pequeno). Se crescer, materializar totais via DynamoDB Streams (registrar em ADR).
+- Metas e alertas (ADR 0011): ao gravar um gasto, o expenses-svc recalcula o total da categoria nos meses afetados e, ao cruzar 80% ou 100% pela primeira vez no mês, publica `MetasAtingidas`; o users-svc envia o Web Push ao dono e aos colaboradores.
+- Chaves VAPID do Web Push: geradas uma vez com `npx web-push generate-vapid-keys` e guardadas à mão em `/gestor-gastos/dev/push/vapid-privada` (SecureString, lida pelo users-svc) e `/gestor-gastos/dev/push/vapid-publica` (String, lida pela esteira do frontend).
 - Gastos fixos recorrentes: MVP lança manualmente com flag `recorrente`; geração automática mensal (EventBridge Scheduler) fica para v2.
 
 ## BFF — endpoints orientados a tela (contrato OpenAPI)
@@ -53,6 +56,8 @@ Cognito User Pool ──► API Gateway HTTP API (JWT authorizer)  ← único po
 - `POST /gastos`, `PUT /gastos/{id}`, `DELETE /gastos/{id}` (escritas também passam pelo BFF por ser o único ponto público; ele só delega)
 - `GET/POST /categorias` (personalizadas)
 - `GET /admin/telas/usuarios`, `PATCH /admin/usuarios/{id}` (status, papel)
+- `GET /metas`, `PUT /metas/{categoriaId}`, `DELETE /metas/{categoriaId}` (metas mensais por categoria; Dono e Editor escrevem)
+- `POST /notificacoes/assinaturas`, `DELETE /notificacoes/assinaturas` (aparelho da pessoa logada, para Web Push)
 
 ## Repositórios (separados, sem monorepo — ADR 0006)
 
